@@ -1,0 +1,13 @@
+Requirements:
+- Consolidate banking information from all banks/accounts
+    - transactions, balances, etc.
+- budgeting
+    - should compare expenditures to budget
+    - send notifications when within range of exceeding budget
+- allow categorization of transactions
+- display transactions in a digestible format (probably graphs)
+    - break transactions down by category 
+    - display expenditures as a percentage of budget 
+
+ideas:
+- project savings based on budget
