@@ -1,4 +1,6 @@
-import {useState} from 'react';
+import {useState} from 'react'
+import './TransactionList.css'
+import { CategoryPie } from './CategoryPie';
 
 function TransactionList() {
    let [transactions, setTransactions] = useState([]);
@@ -10,13 +12,25 @@ function TransactionList() {
 
     return (
         <>
+            {transactions && <CategoryPie transactions={transactions} /> }
             <button onClick={getTransactions}>Get those things!</button>
-            <ul>
+            <ul className='transaction-container'>
                 {transactions.map((item) => {
                     return (
                         <li>
-
-                            {item.name}
+                            <div >
+                                <ul className='transaction-inner-container'>
+                                    <li>
+                                        Name: {item.name}
+                                    </li>
+                                    <li>
+                                        Category: {item.category[0]}
+                                    </li>
+                                    <li>
+                                        Amount: {item.amount}
+                                    </li>
+                                </ul>
+                            </div>
                         </li>
                     );
                     }

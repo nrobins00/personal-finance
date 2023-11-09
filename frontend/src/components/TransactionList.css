@@ -1,0 +1,10 @@
+.transaction-container {
+    display: flex;
+    flex-direction: column;
+    row-gap: 2rem;
+    list-style-type: none;
+}
+
+.transaction-inner-container {
+    list-style-type: none;
+}
