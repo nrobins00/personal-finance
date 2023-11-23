@@ -1,6 +1,7 @@
 import {useState} from 'react'
 import './TransactionList.css'
 import { CategoryPie } from './CategoryPie';
+import { CategoryList } from './CategoryList';
 
 function TransactionList() {
    let [transactions, setTransactions] = useState([]);
@@ -13,6 +14,7 @@ function TransactionList() {
     return (
         <>
             {transactions && <CategoryPie transactions={transactions} /> }
+            {transactions && <CategoryList transactions={transactions} />}
             <button onClick={getTransactions}>Get those things!</button>
             <ul className='transaction-container'>
                 {transactions.map((item) => {

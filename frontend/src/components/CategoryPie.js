@@ -29,8 +29,6 @@ export function CategoryPie({transactions}) {
     if (transactions.length < 1) return null;
     const keyVal = new Map()
     console.log(keyVal.size);
-    keyVal.set('a', 2);
-    console.log(keyVal.size);
     transactions.forEach(element => {
         let category = element.category[0];
         if (keyVal.has(category)) {
@@ -45,11 +43,19 @@ export function CategoryPie({transactions}) {
     });
     const data = {
         labels: Array.from(keyVal.keys()),
+        
         datasets: [
           {
-            label: '# of Votes',
+            label: '$',
             data: Array.from(keyVal.values()),
-            
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.2)',
+                'rgba(54, 162, 235, 0.2)',
+                'rgba(255, 206, 86, 0.2)',
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(153, 102, 255, 0.2)',
+                'rgba(255, 159, 64, 0.2)',
+              ],
             borderWidth: 1,
           },
         ],
