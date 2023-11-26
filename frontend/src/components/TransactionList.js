@@ -1,21 +1,9 @@
-import {useState} from 'react'
-import './TransactionList.css'
-import { CategoryPie } from './CategoryPie';
-import { CategoryList } from './CategoryList';
+import './styles/TransactionList.css'
 
-function TransactionList() {
-   let [transactions, setTransactions] = useState([]);
-    const getTransactions = async () => {
-        const response = await fetch("http://localhost:8080/api/transactions")
-        const data = await response.json();
-        setTransactions([...data.added]);
-    }
+function TransactionList({transactions}) {
 
     return (
         <>
-            {transactions && <CategoryPie transactions={transactions} /> }
-            {transactions && <CategoryList transactions={transactions} />}
-            <button onClick={getTransactions}>Get those things!</button>
             <ul className='transaction-container'>
                 {transactions.map((item) => {
                     return (

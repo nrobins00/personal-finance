@@ -6,8 +6,7 @@ import {
     PlaidLinkOnSuccess,
 } from 'react-plaid-link';
 import { useEffect, useState, useCallback } from 'react';
-import './components/TransactionList';
-import TransactionList from './components/TransactionList';
+import TransactionDisplay from './components/TransactionDisplay';
 
 function App() {
     let [linkToken, setLinkToken] = useState(null)
@@ -27,7 +26,7 @@ function App() {
         <p>
       {linkToken && <LinkButton linkToken={linkToken} setPublicToken={setPublicToken}/>} 
         </p>
-      <TransactionList/>
+      <TransactionDisplay/>
       </header>
     </div>
   );
