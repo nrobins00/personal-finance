@@ -1,10 +1,8 @@
 import React, { useEffect } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Pie } from 'react-chartjs-2';
+import { Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
-
-
 
 export function CategoryPie({transactions}) {
     let [pieData, setPieData] = React.useState(null);
@@ -16,7 +14,7 @@ export function CategoryPie({transactions}) {
     
     return pieData && <> 
      <div>
-     <Pie data={pieData} options={{
+     <Doughnut data={pieData} options={{
         width: 100,
         height: 100,
         

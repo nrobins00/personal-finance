@@ -5,11 +5,16 @@ import './styles/TransactionDisplay.css'
 
 export default function TransactionDisplay() {
     
-   let [transactions, setTransactions] = useState([]);
+   let [transactions, setTransactions] = useState();
     const getTransactions = async () => {
         const response = await fetch("http://localhost:8080/api/transactions")
         const data = await response.json();
-        setTransactions([...data.added]);
+        let firstTenTrans = []
+        for (let i = 0; i < 10; i++) {
+            firstTenTrans.push(data.added[i])
+        }
+        console.log("firstTenTrans:", firstTenTrans)
+        setTransactions(firstTenTrans)
     }
 
 
