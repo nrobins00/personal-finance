@@ -105,6 +105,7 @@ func exchangePublicToken(c *gin.Context) {
 		log.Fatal(httpResp.Body)
 	}
 	accessToken = exchangePublicTokenResp.GetAccessToken()
+    createItem( 
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": accessToken,
@@ -114,11 +115,12 @@ func exchangePublicToken(c *gin.Context) {
 func getTransactions(c *gin.Context) {
 	start := time.Now()
 	const tokenQuery string = `
-        SELECT accessKey FROM item where id = ?
+        SELECT accessKey FROM item where userId = ?
     `
 	var accessToken string
 	err := db.QueryRow(tokenQuery, 1).Scan(&accessToken)
 	if err != nil {
+        //TODO: probably shouldn't crash here
 		log.Fatal(err)
 	}
 	duration := time.Since(start)
@@ -163,41 +165,3 @@ func getTransactions(c *gin.Context) {
 	})
 }
 
-func createDatabase() *sql.DB {
-	db, err := sql.Open("sqlite3", "test.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	const createUserTable string = `
-        CREATE TABLE IF NOT EXISTS user (
-            id INTEGER NOT NULL PRIMARY KEY
-        );   
-    `
-
-	if _, err := db.Exec(createUserTable); err != nil {
-		log.Fatal(err)
-	}
-
-	const createItemTable string = `
-            CREATE TABLE IF NOT EXISTS item (
-                id INTEGER NOT NULL PRIMARY KEY,
-                userId INTEGER NOT NULL,
-                accessKey TEXT,
-                FOREIGN KEY(userId) REFERENCES user(id)
-            );
-    `
-	if _, err := db.Exec(createItemTable); err != nil {
-		log.Fatal(err)
-	}
-	return db
-
-	// const insertAccessKey string = `
-	//     INSERT INTO
-	// `
-}
