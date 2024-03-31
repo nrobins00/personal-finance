@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"database/sql"
+	b64 "encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,12 +21,14 @@ import (
 )
 
 func main() {
-
 	r := gin.Default()
+	r.POST("/signin", signin)
+	r.OPTIONS("/signin", allowCors)
 	r.POST("/api/linktoken", createLinkToken)
 	r.POST("/api/publicToken", exchangePublicToken)
 	r.OPTIONS("/api/publicToken", allowCors)
 	r.GET("/api/transactions", getTransactions)
+	r.OPTIONS("/api/transactions", allowCors)
 
 	r.Run()
 }
@@ -45,8 +51,8 @@ func init() {
 	clientId = os.Getenv("PLAID_CLIENT_ID")
 	secret = os.Getenv("PLAID_SECRET")
 
-	fmt.Printf("clientId: %s", clientId)
-	fmt.Printf("secret: %s", secret)
+	fmt.Printf("clientId: %s\n", clientId)
+	fmt.Printf("secret: %s\n", secret)
 	configuration := plaid.NewConfiguration()
 	configuration.AddDefaultHeader("PLAID-CLIENT-ID", clientId)
 	configuration.AddDefaultHeader("PLAID-SECRET", secret)
@@ -56,8 +62,40 @@ func init() {
 
 func allowCors(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
-	c.Header("Access-Control-Allow-Headers", "Content-Type")
-	c.Header("Access-Control-Allow-Methods", "POST")
+	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
+	c.Header("Access-Control-Allow-Methods", "POST, GET")
+}
+
+func signin(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
+	c.Header("Access-Control-Allow-Methods", "POST, GET")
+	auth := c.GetHeader("Authorization")
+	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	const userQuery string = `
+		SELECT userId FROM user
+		WHERE username = ? AND password = ?;
+	`
+	var userId int
+	userAndPass := strings.Split(string(usernameAndPass), ":")
+	if len(userAndPass) != 2 {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	username := userAndPass[0]
+	pass := userAndPass[1]
+	err = db.QueryRow(userQuery, username, pass).Scan(&userId)
+	if err != nil {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+	idCookie := fmt.Sprintf("userId=%d", userId)
+	c.Header("Set-Cookie", idCookie)
+	c.Status(http.StatusOK)
 }
 
 func createLinkToken(c *gin.Context) {
@@ -81,14 +119,22 @@ func createLinkToken(c *gin.Context) {
 }
 
 func exchangePublicToken(c *gin.Context) {
+	userIdString, err := c.Cookie("userId")
+	if err != nil {
+		c.Status(http.StatusUnauthorized)
+	}
+	userId, err := strconv.ParseInt(userIdString, 10, 64)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+	}
 	ctx := context.Background()
 	//publicToken := c.Request.Body.Read()("public_token")
 	d := json.NewDecoder(c.Request.Body)
-	d.DisallowUnknownFields()
+	d.DisallowUnknownFields() //why??
 	t := struct {
 		Public_token string
 	}{}
-	err := d.Decode(&t)
+	err = d.Decode(&t)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "public_token was empty",
@@ -105,7 +151,11 @@ func exchangePublicToken(c *gin.Context) {
 		log.Fatal(httpResp.Body)
 	}
 	accessToken = exchangePublicTokenResp.GetAccessToken()
-    createItem( 
+	fmt.Printf("userId: %d\n", userId)
+
+	//TODO: put access token in database
+	createItem(userId, accessToken)
+
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": accessToken,
@@ -113,14 +163,31 @@ func exchangePublicToken(c *gin.Context) {
 }
 
 func getTransactions(c *gin.Context) {
+	auth := c.GetHeader("Authorization")
+	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
+	const userQuery string = `
+		SELECT userId FROM user
+		WHERE username = ? AND password = ?;
+	`
+	var userId int
+	userAndPassSlice := strings.Split(string(usernameAndPass), ":")
+	if len(userAndPassSlice) != 2 {
+		log.Fatal(errors.New("abc"))
+	}
+	username := userAndPassSlice[0]
+	pass := userAndPassSlice[1]
+	fmt.Println(username, pass)
+	err = db.QueryRow(userQuery, username, pass).Scan(&userId)
+	fmt.Println(userId)
+
 	start := time.Now()
 	const tokenQuery string = `
         SELECT accessKey FROM item where userId = ?
     `
 	var accessToken string
-	err := db.QueryRow(tokenQuery, 1).Scan(&accessToken)
+	err = db.QueryRow(tokenQuery, userId).Scan(&accessToken)
 	if err != nil {
-        //TODO: probably shouldn't crash here
+		//TODO: probably shouldn't crash here
 		log.Fatal(err)
 	}
 	duration := time.Since(start)
@@ -164,4 +231,3 @@ func getTransactions(c *gin.Context) {
 		"added": added,
 	})
 }
-

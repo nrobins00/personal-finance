@@ -18,10 +18,19 @@ func createDatabase() *sql.DB {
 		log.Fatal(err)
 	}
 
+	/*const dropUserTable string = `
+		DROP TABLE IF EXISTS user;
+	`
+	if _, err := db.Exec(dropUserTable); err != nil {
+		log.Fatal(err)
+	}*/
+
 	const createUserTable string = `
-        CREATE TABLE IF NOT EXISTS user (
-            id INTEGER NOT NULL PRIMARY KEY
-        );   
+		CREATE TABLE IF NOT EXISTS user (
+			userId INTEGER NOT NULL PRIMARY KEY,
+			username VARCHAR NOT NULL UNIQUE,
+			password VARCHAR NOT NULL
+        );
     `
 
 	if _, err := db.Exec(createUserTable); err != nil {
@@ -30,12 +39,12 @@ func createDatabase() *sql.DB {
 
 	const createItemTable string = `
             CREATE TABLE IF NOT EXISTS item (
-                id INTEGER NOT NULL PRIMARY KEY,
+                itemId INTEGER NOT NULL PRIMARY KEY,
                 userId INTEGER NOT NULL,
                 accessKey TEXT,
-                FOREIGN KEY(userId) REFERENCES user(id)
+                FOREIGN KEY(userId) REFERENCES user(userId)
             );
-    `
+	`
 	if _, err := db.Exec(createItemTable); err != nil {
 		log.Fatal(err)
 	}
@@ -46,19 +55,30 @@ func createDatabase() *sql.DB {
 	// `
 }
 
-func createItem(user string, accessKey string) (int64, error) {
-    const storeToken = `
-        INSERT INTO item (userId, accessKey)
-        VALUES (?, ?)
-    `
-    result, err := db.Exec(storeToken, user, accessKey)
-    if err != nil {
-        return -1, err
-    }
-    insertedId, err := result.LastInsertId()
-    if err != nil {
-        return -1, nil
-    }
-    return insertedId, nil
+func createUser(username string) (int64, error) {
+	const createUser = `
+		INSERT INTO user (username, password)
+		VALUES (?, ?)
+	`
+	result, err := db.Exec(createUser, username, "x")
+	if err != nil {
+		return -1, err
+	}
+	return result.LastInsertId()
 }
 
+func createItem(user int64, accessKey string) (int64, error) {
+	const storeToken = `
+		INSERT INTO item (userId, accessKey)
+		VALUES (?, ?)
+	`
+	result, err := db.Exec(storeToken, user, accessKey)
+	if err != nil {
+		return -1, err
+	}
+	insertedId, err := result.LastInsertId()
+	if err != nil {
+		return -1, nil
+	}
+	return insertedId, nil
+}
