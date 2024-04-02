@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	b64 "encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -64,14 +63,14 @@ func allowCors(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
 	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 	c.Header("Access-Control-Allow-Methods", "POST, GET")
-	c.Header("Access-Control-Allow-Credentials", "true");
+	c.Header("Access-Control-Allow-Credentials", "true")
 }
 
 func signin(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
 	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 	c.Header("Access-Control-Allow-Methods", "POST, GET")
-	c.Header("Access-Control-Allow-Credentials", "true");
+	c.Header("Access-Control-Allow-Credentials", "true")
 	auth := c.GetHeader("Authorization")
 	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
 	if err != nil {
@@ -121,6 +120,7 @@ func createLinkToken(c *gin.Context) {
 }
 
 func exchangePublicToken(c *gin.Context) {
+	c.Header("Access-Control-Allow-Credentials", "true")
 	userIdString, err := c.Cookie("userId")
 	if err != nil {
 		c.Status(http.StatusUnauthorized)
@@ -165,22 +165,14 @@ func exchangePublicToken(c *gin.Context) {
 }
 
 func getTransactions(c *gin.Context) {
-	auth := c.GetHeader("Authorization")
-	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
-	const userQuery string = `
-		SELECT userId FROM user
-		WHERE username = ? AND password = ?;
-	`
-	var userId int
-	userAndPassSlice := strings.Split(string(usernameAndPass), ":")
-	if len(userAndPassSlice) != 2 {
-		log.Fatal(errors.New("abc"))
+	userIdString, err := c.Cookie("userId")
+	if err != nil {
+		c.Status(http.StatusUnauthorized)
 	}
-	username := userAndPassSlice[0]
-	pass := userAndPassSlice[1]
-	fmt.Println(username, pass)
-	err = db.QueryRow(userQuery, username, pass).Scan(&userId)
-	fmt.Println(userId)
+	userId, err := strconv.ParseInt(userIdString, 10, 64)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+	}
 
 	start := time.Now()
 	const tokenQuery string = `
@@ -226,7 +218,8 @@ func getTransactions(c *gin.Context) {
 		cursor = resp.GetNextCursor()
 	}
 
-	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
+	c.Header("Access-Control-Allow-Credentials", "true")
 	//enc := json.NewEncoder(c.Writer)
 	fmt.Println(added, modified, removed)
 	c.JSON(http.StatusOK, gin.H{
