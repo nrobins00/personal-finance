@@ -30,11 +30,12 @@ function LoginForm({ setLoggedIn }) {
             method: 'POST',
             headers: {
                 "Authorization": btoa(username + ":" + password)
-            }
+            },
+            credentials: "include",
         });
         if (response.status === 200) {
             setLoggedIn(true);
-        } else {
+        } else  {
             //TODO
         }
     }
@@ -92,6 +93,7 @@ function LinkButton({ linkToken, setPublicToken }) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({ "Public_token": public_token }),
+            credentials: "include",
         });
         const data = await response.json();
         console.log(data.access_token);

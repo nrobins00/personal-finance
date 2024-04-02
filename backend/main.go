@@ -61,15 +61,17 @@ func init() {
 }
 
 func allowCors(c *gin.Context) {
-	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
 	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 	c.Header("Access-Control-Allow-Methods", "POST, GET")
+	c.Header("Access-Control-Allow-Credentials", "true");
 }
 
 func signin(c *gin.Context) {
-	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
 	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 	c.Header("Access-Control-Allow-Methods", "POST, GET")
+	c.Header("Access-Control-Allow-Credentials", "true");
 	auth := c.GetHeader("Authorization")
 	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
 	if err != nil {
@@ -93,7 +95,7 @@ func signin(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
-	idCookie := fmt.Sprintf("userId=%d", userId)
+	idCookie := fmt.Sprintf("userId=%d; SameSite=None", userId)
 	c.Header("Set-Cookie", idCookie)
 	c.Status(http.StatusOK)
 }
@@ -156,7 +158,7 @@ func exchangePublicToken(c *gin.Context) {
 	//TODO: put access token in database
 	createItem(userId, accessToken)
 
-	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": accessToken,
 	})
