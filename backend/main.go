@@ -16,7 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/plaid/plaid-go/v17/plaid"
+	"github.com/nrobins00/personal-finance/tokens"
+	"github.com/plaid/plaid-go/plaid"
 )
 
 func main() {
@@ -77,11 +78,6 @@ func signin(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	const userQuery string = `
-		SELECT userId FROM user
-		WHERE username = ? AND password = ?;
-	`
-	var userId int
 	userAndPass := strings.Split(string(usernameAndPass), ":")
 	if len(userAndPass) != 2 {
 		c.Status(http.StatusBadRequest)
@@ -89,7 +85,7 @@ func signin(c *gin.Context) {
 	}
 	username := userAndPass[0]
 	pass := userAndPass[1]
-	err = db.QueryRow(userQuery, username, pass).Scan(&userId)
+	userId, err := getUserId(username, pass)
 	if err != nil {
 		c.Status(http.StatusUnauthorized)
 		return
@@ -100,20 +96,7 @@ func signin(c *gin.Context) {
 }
 
 func createLinkToken(c *gin.Context) {
-	ctx := context.Background()
-	user := plaid.LinkTokenCreateRequestUser{ClientUserId: clientId}
-	request := plaid.NewLinkTokenCreateRequest(
-		"Plaid Test", "en", []plaid.CountryCode{plaid.COUNTRYCODE_US},
-		user,
-	)
-	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH})
-	request.SetLinkCustomizationName("default")
-	resp, httpResp, err := client.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()
-	if err != nil {
-		fmt.Println(httpResp.Body)
-		log.Fatal(err)
-	}
-	linkToken := resp.GetLinkToken()
+	linkToken := tokens.GetLinkToken(client, clientId)
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.JSON(http.StatusOK, gin.H{
 		"link_token": linkToken})
@@ -184,6 +167,7 @@ func getTransactions(c *gin.Context) {
 		//TODO: probably shouldn't crash here
 		log.Fatal(err)
 	}
+	fmt.Println(accessToken)
 	duration := time.Since(start)
 	fmt.Println(duration)
 	ctx := context.Background()
@@ -196,7 +180,7 @@ func getTransactions(c *gin.Context) {
 	//    IncludePersonalFinanceCategory := true,
 	//}
 
-	for hasMore {
+	for hasMore && len(added) < 10 {
 		request := plaid.NewTransactionsSyncRequest(accessToken)
 		//request.SetOptions(options)
 		if cursor != "" {

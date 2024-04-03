@@ -82,3 +82,13 @@ func createItem(user int64, accessKey string) (int64, error) {
 	}
 	return insertedId, nil
 }
+
+func getUserId(username, password string) (int, error) {
+	const userQuery string = `
+		SELECT userId FROM user
+		WHERE username = ? AND password = ?;
+	`
+	var userId int
+	err := db.QueryRow(userQuery, username, password).Scan(&userId)
+	return userId, err
+}

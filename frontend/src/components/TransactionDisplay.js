@@ -9,14 +9,12 @@ export default function TransactionDisplay() {
     const getTransactions = async () => {
         const response = await fetch("http://localhost:8080/api/transactions", {
             method: "GET",
-            headers: {
-                "Authorization": btoa("nrobins:x"),
-            }
+            credentials: "include",
         })
         const data = await response.json();
         let firstTenTrans = []
         for (let i = 0; i < 10; i++) {
-            firstTenTrans.push(data.added[i])
+            firstTenTrans.push(data.added ? data.added[i] : null)
         }
         console.log("firstTenTrans:", firstTenTrans)
         setTransactions(firstTenTrans)
