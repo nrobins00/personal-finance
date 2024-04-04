@@ -35,7 +35,7 @@ function LoginForm({ setLoggedIn }) {
         });
         if (response.status === 200) {
             setLoggedIn(true);
-        } else  {
+        } else {
             //TODO
         }
     }
