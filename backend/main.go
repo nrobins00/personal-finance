@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	b64 "encoding/base64"
 	"encoding/json"
 	"flag"
@@ -18,7 +17,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/nrobins00/personal-finance/tokens"
+	"github.com/nrobins00/personal-finance/database"
+	"github.com/nrobins00/personal-finance/plaidActions"
 	"github.com/plaid/plaid-go/plaid"
 )
 
@@ -72,7 +72,7 @@ var (
 	clientId    string
 	secret      string
 	accessToken string
-	db          *sql.DB
+	db          *database.DB
 )
 
 func init() {
@@ -80,7 +80,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db = createDatabase()
+	db = database.CreateDatabase()
 
 	clientId = os.Getenv("PLAID_CLIENT_ID")
 	secret = os.Getenv("PLAID_SECRET")
@@ -120,7 +120,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	}
 	username := userAndPass[0]
 	pass := userAndPass[1]
-	userId, err := getUserId(username, pass)
+	userId, err := db.GetUserId(username, pass)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -131,7 +131,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 }
 
 func createLinkToken(w http.ResponseWriter, r *http.Request) {
-	linkToken := tokens.GetLinkToken(client, clientId)
+	linkToken := plaidActions.GetLinkToken(client, clientId)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	resp := map[string]string{"link_token": linkToken}
 	json, err := json.Marshal(resp)
@@ -174,9 +174,10 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(httpResp.Body)
 	}
 	accessToken = exchangePublicTokenResp.GetAccessToken()
-	fmt.Printf("userId: %d\n", userId)
+	itemId := exchangePublicTokenResp.GetItemId()
+	fmt.Printf("userId: %d\nitemId: %s", userId, itemId)
 
-	createItem(userId, accessToken)
+	db.CreateItem(userId, itemId, accessToken)
 
 	resp := map[string]string{"access_token": accessToken}
 	json, err := json.Marshal(resp)
@@ -204,6 +205,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow(tokenQuery, userId).Scan(&accessToken)
 	if err != nil {
 
+		w.WriteHeader(http.StatusNotFound)
 		//TODO: probably shouldn't crash here
 		log.Fatal(err)
 	}
@@ -240,6 +242,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		hasMore = resp.GetHasMore()
 
 		cursor = resp.GetNextCursor()
+		resp.GetNextCursor()
 	}
 
 	//enc := json.NewEncoder(c.Writer)
@@ -250,4 +253,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	w.Write(json)
+}
+
+func getBalance(w http.ResponseWriter, r *http.Request) {
+
 }
