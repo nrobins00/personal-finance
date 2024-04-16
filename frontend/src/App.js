@@ -63,6 +63,7 @@ function HomePage() {
     let [linkToken, setLinkToken] = useState(null)
     let [publicToken, setPublicToken] = useState(null)
     let [err, setErr] = useState(null)
+    let [accounts, setAccounts] = useState([])
     const fetchLinkTokenAndDoLink = async () => {
         if (linkToken) return;
         const response = await fetch("http://localhost:8080/api/linktoken", { method: 'POST' });
@@ -70,6 +71,15 @@ function HomePage() {
         console.log(data.link_token);
         setLinkToken(data.link_token)
     }
+    const getAllAccounts = async () => {
+        const response = await fetch("http://localhost:8080/api/accounts", {
+            method: 'GET',
+            credentials: "include",
+        });
+        const data = await response.json()
+        console.log(data);
+    }
+
     useEffect(() => { fetchLinkTokenAndDoLink() }, [])
 
     return (
@@ -77,6 +87,11 @@ function HomePage() {
             <header>
                 <p>
                     {linkToken && <LinkButton linkToken={linkToken} setPublicToken={setPublicToken} />}
+                </p>
+                <p>
+                    <button onClick={getAllAccounts}>
+                        Get all items
+                    </button>
                 </p>
                 <TransactionDisplay />
             </header>

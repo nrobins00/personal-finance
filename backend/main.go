@@ -34,6 +34,7 @@ func main() {
 	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
 	//r.OPTIONS("/api/publicToken", allowCors)
 	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
 	//r.OPTIONS("/api/transactions", allowCors)
 
 	r.Use(mux.CORSMethodMiddleware(r))
@@ -80,7 +81,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db = database.CreateDatabase()
+	db = database.CreateDatabase("test.db")
 
 	clientId = os.Getenv("PLAID_CLIENT_ID")
 	secret = os.Getenv("PLAID_SECRET")
@@ -120,6 +121,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	}
 	username := userAndPass[0]
 	pass := userAndPass[1]
+	fmt.Printf("username: %s, pass: %s", username, pass)
 	userId, err := db.GetUserId(username, pass)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -143,6 +145,9 @@ func createLinkToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		return
+	}
 	userIdCookie, err := r.Cookie("userId")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -187,6 +192,50 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
+type item struct {
+	itemId, accessToken string
+}
+
+func getAllAccounts(w http.ResponseWriter, r *http.Request) {
+	userIdCookie, err := r.Cookie("userId")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+	userId, err := strconv.ParseInt(userIdCookie.Value, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	const itemQuery string = `
+		SELECT itemId, accessKey FROM item where userId = ?
+	`
+	rows, err := db.Query(itemQuery, userId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	items := make([]item, 0)
+	defer rows.Close()
+	for rows.Next() {
+		var itemId, accessToken string
+		if err := rows.Scan(&itemId, &accessToken); err != nil {
+			log.Fatal(err)
+		}
+		items = append(items, item{itemId, accessToken})
+	}
+
+	rerr := rows.Close()
+	if rerr != nil {
+		log.Fatal(err)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+	w.WriteHeader(http.StatusOK)
+	resp := map[string][]item{"items": items}
+	body, err := json.Marshal(resp)
+	w.Write(body)
+}
+
 func getTransactions(w http.ResponseWriter, r *http.Request) {
 	userIdCookie, err := r.Cookie("userId")
 	if err != nil {
@@ -199,7 +248,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 	const tokenQuery string = `
-        SELECT accessKey FROM item where userId = ?
+        SELECT itemId, accessKey FROM item where userId = ?
     `
 	var accessToken string
 	err = db.QueryRow(tokenQuery, userId).Scan(&accessToken)
@@ -217,6 +266,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	var added []plaid.Transaction
 	var modified []plaid.Transaction
 	var removed []plaid.RemovedTransaction
+	//var accounts []plaid.AccountBase
 	hasMore := true
 	//options := plaid.TransactionsSyncRequestOptions{
 	//    IncludePersonalFinanceCategory := true,
@@ -242,10 +292,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		hasMore = resp.GetHasMore()
 
 		cursor = resp.GetNextCursor()
-		resp.GetNextCursor()
 	}
 
 	//enc := json.NewEncoder(c.Writer)
+	//db.UpdateTransactions(item)
 	fmt.Println(added, modified, removed)
 	resp := map[string][]plaid.Transaction{"added": added}
 	json, err := json.Marshal(resp)

@@ -39,13 +39,13 @@ func CreateDatabase(filename string) *DB {
     `
 
 	if _, err := db.Exec(createUserTable); err != nil {
-		log.Fatal(err)
+		log.Fatal("createUserTable", err)
 	}
 
 	const createItemTable string = `
             CREATE TABLE IF NOT EXISTS item (
 				itemKey INTEGER NOT NULL PRIMARY KEY,
-                itemId TEXT NOT NULL PRIMARY KEY,
+                itemId TEXT NOT NULL,
                 userId INTEGER NOT NULL,
                 accessKey TEXT,
 				cursor TEXT,
@@ -53,21 +53,24 @@ func CreateDatabase(filename string) *DB {
             );
 	`
 	if _, err := db.Exec(createItemTable); err != nil {
-		log.Fatal(err)
+		log.Fatal("createItemTable", err)
 	}
 
 	const createTransactionTable string = `
-		CREATE TABLE IF NOT EXISTS transaction (
-			transactionKey INTEGER NOT NULL PRIMARY KEY
+		CREATE TABLE IF NOT EXISTS transax (
+			transactionKey INTEGER NOT NULL PRIMARY KEY,
 			transactionId TEXT NOT NULL,
-			accountId TEXT,
+			accountKey INTEGER,
 			amount REAL,
-			categoryKey INTEGER,
-			authorizedDttm TEXT
-			FOREIGN KEY(categoryKey) REFERENCES transactionCategory(categoryId)
+			categoryId INTEGER,
+			authorizedDttm TEXT,
+			FOREIGN KEY(categoryId) REFERENCES transactionCategory(categoryId),
+			FOREIGN KEY(accountKey) REFERENCES account(accountKey)
 		);
 	`
-
+	if _, err := db.Exec(createTransactionTable); err != nil {
+		log.Fatal("createTransactionTable", err)
+	}
 	//const createTransactionCategoryTable string = `
 	//	CREATE TABLE IF NOT EXISTS transactionCategory (
 	//		categoryId INTEGER NOT NULL PRIMARY KEY,
@@ -80,15 +83,21 @@ func CreateDatabase(filename string) *DB {
 		CREATE TABLE IF NOT EXISTS account (
 			accountKey INTEGER NOT NULL PRIMARY KEY,
 			accountId TEXT NOT NULL,
+			userId INTEGER,
+			itemKey INTEGER,
 			mask TEXT,
 			name TEXT,
 			availableBalance REAL,
 			currentBalance REAL,
 			lastUpdatedDttm TEXT,
+			FOREIGN KEY(userId) REFERENCES user(userId),
+			FOREIGN KEY(itemKey) REFERENCES item(itemKey)
 		);
 	`
-
-	return &DB{}
+	if _, err := db.Exec(createAccountTable); err != nil {
+		log.Fatal("createAccountTable", err)
+	}
+	return &DB{db}
 
 	// const insertAccessKey string = `
 	//     INSERT INTO
@@ -109,10 +118,10 @@ func (db *DB) CreateUser(username string) (int64, error) {
 
 func (db *DB) CreateItem(user int64, itemId string, accessKey string) (int64, error) {
 	const storeToken = `
-		INSERT INTO item (userId, accessKey)
-		VALUES (?, ?)
+		INSERT INTO item (itemId, userId, accessKey)
+		VALUES (?, ?, ?)
 	`
-	result, err := db.Exec(storeToken, user, accessKey)
+	result, err := db.Exec(storeToken, itemId, user, accessKey)
 	if err != nil {
 		return -1, err
 	}
@@ -175,4 +184,17 @@ func (db *DB) GetUserId(username, password string) (int, error) {
 	var userId int
 	err := db.QueryRow(userQuery, username, password).Scan(&userId)
 	return userId, err
+}
+
+func (db *DB) GetLatestCursor(itemId string) (string, error) {
+	const cursorQuery string = `
+		SELECT cursorId FROM item
+		WHERE itemId = ?
+	`
+	var cursor string
+	err := db.QueryRow(cursorQuery).Scan(&cursor)
+	if err != nil {
+		return "", err
+	}
+	return cursor, nil
 }
