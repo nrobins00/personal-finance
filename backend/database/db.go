@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -198,3 +199,58 @@ func (db *DB) GetLatestCursor(itemId string) (string, error) {
 	}
 	return cursor, nil
 }
+
+type Account struct {
+	Base    plaid.AccountBase
+	ItemKey int
+}
+
+func (db *DB) InsertAccounts(userId int64, accounts []Account) {
+	query := `
+		INSERT INTO account (
+			accountId, 
+			userId, 
+			itemKey, 
+			mask,
+			name,
+			availableBalance, 
+			currentBalance, 
+			lastUpdatedDttm
+		) VALUES
+	`
+	for accountNum, acc := range accounts {
+		valueString := fmt.Sprintf("('%s', %d, %d, '%s', '%s', %f, %f, '%s')",
+			acc.Base.AccountId, userId, acc.ItemKey, acc.Base.GetMask(), acc.Base.GetName(),
+			*acc.Base.GetBalances().Available.Get(), *acc.Base.GetBalances().Current.Get(),
+			acc.Base.Balances.GetLastUpdatedDatetime())
+		query += valueString
+		if accountNum < len(accounts)-1 {
+			query += ", "
+		}
+	}
+	fmt.Println(query)
+
+	_, err := db.Exec(query)
+	if err != nil {
+		log.Fatal("insert accounts", err)
+	}
+}
+
+/*
+
+	rows, err := db.Query(accQuery, key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for rows.Next() {
+		var accountId int
+		var name string
+		var availBal, curBal float32
+		if err := rows.Scan(&accountId, &name, &availBal, &curBal); err != nil {
+			rows.Close()
+			log.Fatal(err)
+		}
+		accounts = append(accounts, account{accountId, name, availBal, curBal})
+	}
+	rows.Close()
+*/

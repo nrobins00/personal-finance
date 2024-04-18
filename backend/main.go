@@ -192,8 +192,15 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
+type account struct {
+	accountId                int
+	name                     string
+	availableBal, currentBal float32
+}
+
 type item struct {
-	itemId, accessToken string
+	itemKey   int
+	accessKey string
 }
 
 func getAllAccounts(w http.ResponseWriter, r *http.Request) {
@@ -206,8 +213,15 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 	const itemQuery string = `
-		SELECT itemId, accessKey FROM item where userId = ?
+		SELECT itemKey, accessKey FROM item where userId = ?
 	`
+
+	const accQuery string = `
+		SELECT accountId, name, availableBalance, currentBalance
+		FROM account
+		WHERE itemKey = ?
+	`
+
 	rows, err := db.Query(itemQuery, userId)
 	if err != nil {
 		log.Fatal(err)
@@ -215,23 +229,37 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 	items := make([]item, 0)
 	defer rows.Close()
 	for rows.Next() {
-		var itemId, accessToken string
-		if err := rows.Scan(&itemId, &accessToken); err != nil {
+		var itemKey int
+		var accessKey string
+		if err := rows.Scan(&itemKey, &accessKey); err != nil {
 			log.Fatal(err)
 		}
-		items = append(items, item{itemId, accessToken})
-	}
-
-	rerr := rows.Close()
-	if rerr != nil {
-		log.Fatal(err)
+		items = append(items, item{itemKey, accessKey})
 	}
 
 	if err := rows.Err(); err != nil {
 		log.Fatal(err)
 	}
+	ctx := context.Background()
+	accounts := make([]database.Account, 0)
+	for _, key := range items {
+		accountsGetRequest := plaid.NewAccountsGetRequest(key.accessKey)
+		accountsGetResp, _, err := client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
+			*accountsGetRequest,
+		).Execute()
+		if err != nil {
+			log.Fatal("accounts/get execute", err)
+		}
+		for _, acc := range accountsGetResp.GetAccounts() {
+			account := database.Account{Base: acc, ItemKey: key.itemKey}
+			accounts = append(accounts, account)
+		}
+	}
+
+	db.InsertAccounts(userId, accounts)
+
 	w.WriteHeader(http.StatusOK)
-	resp := map[string][]item{"items": items}
+	resp := map[string][]database.Account{"accounts": accounts}
 	body, err := json.Marshal(resp)
 	w.Write(body)
 }

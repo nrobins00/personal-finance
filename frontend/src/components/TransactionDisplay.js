@@ -24,7 +24,7 @@ export default function TransactionDisplay() {
 
     return (
         <>
-            <button onClick={getTransactions}>Get those things!</button>
+            <button onClick={getTransactions}>Get all transactions</button>
             <div className="row">
                 <div className="col">{transactions && <TransactionList transactions={transactions} />}</div>
                 <div className="col">{transactions && <CategoryPie transactions={transactions} />}</div>
