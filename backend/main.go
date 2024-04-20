@@ -17,7 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/nrobins00/personal-finance/database"
+	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/plaidActions"
 	"github.com/plaid/plaid-go/plaid"
 )
@@ -29,13 +29,10 @@ func main() {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
-	//r.HandleFu("/signin", allowCors)
 	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
-	//r.OPTIONS("/api/publicToken", allowCors)
 	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
-	//r.OPTIONS("/api/transactions", allowCors)
 
 	r.Use(mux.CORSMethodMiddleware(r))
 	r.Use(CorsMiddleware)

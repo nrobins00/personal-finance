@@ -1,11 +1,15 @@
 package database
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/nrobins00/personal-finance/internal/types"
 	"github.com/plaid/plaid-go/plaid"
 )
 
@@ -200,12 +204,7 @@ func (db *DB) GetLatestCursor(itemId string) (string, error) {
 	return cursor, nil
 }
 
-type Account struct {
-	Base    plaid.AccountBase
-	ItemKey int
-}
-
-func (db *DB) InsertAccounts(userId int64, accounts []Account) {
+func (db *DB) InsertAccounts(userId int64, accounts []types.Account) {
 	query := `
 		INSERT INTO account (
 			accountId, 
@@ -254,3 +253,59 @@ func (db *DB) InsertAccounts(userId int64, accounts []Account) {
 	}
 	rows.Close()
 */
+
+func (db *DB) getAllAccounts(userId int64) {
+	const itemQuery string = `
+		SELECT itemKey, accessKey FROM item where userId = ?
+	`
+
+	const accQuery string = `
+		SELECT accountId, name, availableBalance, currentBalance
+		FROM account
+		WHERE itemKey = ?
+	`
+
+	rows, err := db.Query(itemQuery, userId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	items := make([]types.Item, 0)
+	defer rows.Close()
+	for rows.Next() {
+		var itemKey int
+		var accessKey string
+		if err := rows.Scan(&itemKey, &accessKey); err != nil {
+			log.Fatal(err)
+		}
+		items = append(items, types.Item{
+			ItemKey:   itemKey,
+			AccessKey: accessKey,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+	ctx := context.Background()
+	accounts := make([]types.Account, 0)
+	for _, key := range items {
+		accountsGetRequest := plaid.NewAccountsGetRequest(key.accessKey)
+		accountsGetResp, _, err := client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
+			*accountsGetRequest,
+		).Execute()
+		if err != nil {
+			log.Fatal("accounts/get execute", err)
+		}
+		for _, acc := range accountsGetResp.GetAccounts() {
+			account := database.Account{Base: acc, ItemKey: key.itemKey}
+			accounts = append(accounts, account)
+		}
+	}
+
+	db.InsertAccounts(userId, accounts)
+
+	w.WriteHeader(http.StatusOK)
+	resp := map[string][]database.Account{"accounts": accounts}
+	body, err := json.Marshal(resp)
+	w.Write(body)
+}
