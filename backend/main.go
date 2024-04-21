@@ -4,72 +4,27 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nrobins00/personal-finance/internal/database"
-	"github.com/nrobins00/personal-finance/plaidActions"
+	"github.com/nrobins00/personal-finance/internal/plaidActions"
 	"github.com/plaid/plaid-go/plaid"
 )
 
 func main() {
-	var wait time.Duration
-	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "duration to wait for existing connections to close")
-	flag.Parse()
 
-	r := mux.NewRouter()
-	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
-	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
-
-	r.Use(mux.CORSMethodMiddleware(r))
-	r.Use(CorsMiddleware)
-
-	srv := &http.Server{
-		Addr:         "0.0.0.0:8080",
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
-		Handler:      r,
-	}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Println(err)
-		}
-	}()
-
-	c := make(chan os.Signal, 1)
-
-	signal.Notify(c, os.Interrupt)
-
-	<-c
-
-	ctx, cancel := context.WithTimeout(context.Background(), wait)
-	defer cancel()
-
-	srv.Shutdown(ctx)
-
-	log.Println("shutting down")
-	os.Exit(0)
 }
 
 var (
-	client      *plaid.APIClient
-	clientId    string
-	secret      string
-	accessToken string
+	plaidClient plaidActions.PlaidClient
 	db          *database.DB
 )
 
@@ -85,11 +40,8 @@ func init() {
 
 	fmt.Printf("clientId: %s\n", clientId)
 	fmt.Printf("secret: %s\n", secret)
-	configuration := plaid.NewConfiguration()
-	configuration.AddDefaultHeader("PLAID-CLIENT-ID", clientId)
-	configuration.AddDefaultHeader("PLAID-SECRET", secret)
-	configuration.UseEnvironment(plaid.Sandbox)
-	client = plaid.NewAPIClient(configuration)
+	plaidClient := PlaidClient{ClientId: clientId, Secret: secret}
+	plaidClient.InitClient()
 }
 
 func CorsMiddleware(next http.Handler) http.Handler {
@@ -154,7 +106,6 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
-	ctx := context.Background()
 	//publicToken := c.Request.Body.Read()("public_token")
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields() //why??
@@ -168,15 +119,7 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(t)
 	publicToken := t.Public_token
 	fmt.Printf("publicToken: %s", publicToken)
-	exchangePublicTokenReq := plaid.NewItemPublicTokenExchangeRequest(publicToken)
-	exchangePublicTokenResp, httpResp, err := client.PlaidApi.ItemPublicTokenExchange(ctx).ItemPublicTokenExchangeRequest(
-		*exchangePublicTokenReq,
-	).Execute()
-	if err != nil {
-		log.Fatal(httpResp.Body)
-	}
-	accessToken = exchangePublicTokenResp.GetAccessToken()
-	itemId := exchangePublicTokenResp.GetItemId()
+	accessToken, itemId := plaidClient.ExchangePublicToken(publicToken)
 	fmt.Printf("userId: %d\nitemId: %s", userId, itemId)
 
 	db.CreateItem(userId, itemId, accessToken)
