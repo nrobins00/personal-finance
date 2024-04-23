@@ -2,8 +2,6 @@ package types
 
 import (
 	"time"
-
-	"github.com/plaid/plaid-go/plaid"
 )
 
 type User struct {
@@ -13,8 +11,13 @@ type User struct {
 }
 
 type Account struct {
-	Base    plaid.AccountBase
-	ItemKey int
+	AccountId        string
+	AvailableBalance float32
+	CurrentBalance   float32
+	Mask             string
+	Name             string
+	ItemKey          int
+	LastUpdatedDttm  time.Time
 }
 
 type Item struct {

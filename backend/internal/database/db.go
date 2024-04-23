@@ -1,12 +1,9 @@
 package database
 
 import (
-	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nrobins00/personal-finance/internal/types"
@@ -103,10 +100,6 @@ func CreateDatabase(filename string) *DB {
 		log.Fatal("createAccountTable", err)
 	}
 	return &DB{db}
-
-	// const insertAccessKey string = `
-	//     INSERT INTO
-	//
 }
 
 func (db *DB) CreateUser(username string) (int64, error) {
@@ -196,15 +189,22 @@ func (db *DB) GetLatestCursor(itemId string) (string, error) {
 		SELECT cursorId FROM item
 		WHERE itemId = ?
 	`
-	var cursor string
+	var cursor sql.NullString
 	err := db.QueryRow(cursorQuery).Scan(&cursor)
 	if err != nil {
 		return "", err
 	}
-	return cursor, nil
+	var retString string
+	if cursor.Valid {
+		retString = cursor.String
+	}
+	return retString, nil
 }
 
 func (db *DB) InsertAccounts(userId int64, accounts []types.Account) {
+	if len(accounts) == 0 {
+		return
+	}
 	query := `
 		INSERT INTO account (
 			accountId, 
@@ -219,9 +219,9 @@ func (db *DB) InsertAccounts(userId int64, accounts []types.Account) {
 	`
 	for accountNum, acc := range accounts {
 		valueString := fmt.Sprintf("('%s', %d, %d, '%s', '%s', %f, %f, '%s')",
-			acc.Base.AccountId, userId, acc.ItemKey, acc.Base.GetMask(), acc.Base.GetName(),
-			*acc.Base.GetBalances().Available.Get(), *acc.Base.GetBalances().Current.Get(),
-			acc.Base.Balances.GetLastUpdatedDatetime())
+			acc.AccountId, userId, acc.ItemKey, acc.Mask, acc.Name,
+			acc.AvailableBalance, acc.CurrentBalance,
+			acc.LastUpdatedDttm.String())
 		query += valueString
 		if accountNum < len(accounts)-1 {
 			query += ", "
@@ -254,58 +254,65 @@ func (db *DB) InsertAccounts(userId int64, accounts []types.Account) {
 	rows.Close()
 */
 
-func (db *DB) getAllAccounts(userId int64) {
-	const itemQuery string = `
-		SELECT itemKey, accessKey FROM item where userId = ?
-	`
-
+func (db *DB) GetAllAccounts(itemKey int) ([]types.Account, error) {
 	const accQuery string = `
 		SELECT accountId, name, availableBalance, currentBalance
 		FROM account
 		WHERE itemKey = ?
 	`
+	rows, err := db.Query(accQuery, itemKey)
+	if err != nil {
+		return nil, err
+	}
+	accounts := make([]types.Account, 0)
+	defer rows.Close()
+	for rows.Next() {
+		var accountId, name string
+		var availableBalance, currentBalance float32
+		if err := rows.Scan(&accountId, &name, &availableBalance, &currentBalance); err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, types.Account{
+			AccountId:        accountId,
+			Name:             name,
+			AvailableBalance: availableBalance,
+			CurrentBalance:   currentBalance,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return accounts, nil
+}
+
+func (db DB) GetAllItemsForUser(userId int64) ([]types.Item, error) {
+	const itemQuery string = `
+		SELECT itemKey, itemId, accessKey, cursor FROM item where userId = ?
+	`
 
 	rows, err := db.Query(itemQuery, userId)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	items := make([]types.Item, 0)
 	defer rows.Close()
 	for rows.Next() {
 		var itemKey int
-		var accessKey string
-		if err := rows.Scan(&itemKey, &accessKey); err != nil {
+		var accessKey, itemId string
+		var cursor sql.NullString
+		if err := rows.Scan(&itemKey, &accessKey, &itemId, &cursor); err != nil {
 			log.Fatal(err)
 		}
 		items = append(items, types.Item{
 			ItemKey:   itemKey,
+			ItemId:    itemId,
 			AccessKey: accessKey,
+			Cursor:    cursor.String,
 		})
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	ctx := context.Background()
-	accounts := make([]types.Account, 0)
-	for _, key := range items {
-		accountsGetRequest := plaid.NewAccountsGetRequest(key.accessKey)
-		accountsGetResp, _, err := client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
-			*accountsGetRequest,
-		).Execute()
-		if err != nil {
-			log.Fatal("accounts/get execute", err)
-		}
-		for _, acc := range accountsGetResp.GetAccounts() {
-			account := database.Account{Base: acc, ItemKey: key.itemKey}
-			accounts = append(accounts, account)
-		}
-	}
-
-	db.InsertAccounts(userId, accounts)
-
-	w.WriteHeader(http.StatusOK)
-	resp := map[string][]database.Account{"accounts": accounts}
-	body, err := json.Marshal(resp)
-	w.Write(body)
+	return items, nil
 }

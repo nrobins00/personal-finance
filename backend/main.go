@@ -4,23 +4,65 @@ import (
 	"context"
 	b64 "encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/internal/plaidActions"
-	"github.com/plaid/plaid-go/plaid"
+	"github.com/nrobins00/personal-finance/internal/types"
 )
 
 func main() {
+	var wait time.Duration
+	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "duration to wait for existing connections to close")
+	flag.Parse()
 
+	r := mux.NewRouter()
+	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
+	//r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
+
+	r.Use(mux.CORSMethodMiddleware(r))
+	r.Use(CorsMiddleware)
+
+	srv := &http.Server{
+		Addr:         "0.0.0.0:8080",
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+		Handler:      r,
+	}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Println(err)
+		}
+	}()
+
+	c := make(chan os.Signal, 1)
+
+	signal.Notify(c, os.Interrupt)
+
+	<-c
+
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+
+	srv.Shutdown(ctx)
+
+	log.Println("shutting down")
+	os.Exit(0)
 }
 
 var (
@@ -35,12 +77,12 @@ func init() {
 	}
 	db = database.CreateDatabase("test.db")
 
-	clientId = os.Getenv("PLAID_CLIENT_ID")
-	secret = os.Getenv("PLAID_SECRET")
+	clientId := os.Getenv("PLAID_CLIENT_ID")
+	secret := os.Getenv("PLAID_SECRET")
 
 	fmt.Printf("clientId: %s\n", clientId)
 	fmt.Printf("secret: %s\n", secret)
-	plaidClient := PlaidClient{ClientId: clientId, Secret: secret}
+	plaidClient = plaidActions.PlaidClient{ClientId: clientId, Secret: secret}
 	plaidClient.InitClient()
 }
 
@@ -82,7 +124,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 }
 
 func createLinkToken(w http.ResponseWriter, r *http.Request) {
-	linkToken := plaidActions.GetLinkToken(client, clientId)
+	linkToken := plaidClient.GetLinkToken()
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	resp := map[string]string{"link_token": linkToken}
 	json, err := json.Marshal(resp)
@@ -132,17 +174,6 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
-type account struct {
-	accountId                int
-	name                     string
-	availableBal, currentBal float32
-}
-
-type item struct {
-	itemKey   int
-	accessKey string
-}
-
 func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 	userIdCookie, err := r.Cookie("userId")
 	if err != nil {
@@ -152,59 +183,42 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
-	const itemQuery string = `
-		SELECT itemKey, accessKey FROM item where userId = ?
-	`
 
-	const accQuery string = `
-		SELECT accountId, name, availableBalance, currentBalance
-		FROM account
-		WHERE itemKey = ?
-	`
-
-	rows, err := db.Query(itemQuery, userId)
+	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
-		log.Fatal(err)
-	}
-	items := make([]item, 0)
-	defer rows.Close()
-	for rows.Next() {
-		var itemKey int
-		var accessKey string
-		if err := rows.Scan(&itemKey, &accessKey); err != nil {
-			log.Fatal(err)
-		}
-		items = append(items, item{itemKey, accessKey})
+		log.Fatal("error geting items: ", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		log.Fatal(err)
-	}
-	ctx := context.Background()
-	accounts := make([]database.Account, 0)
+	allAccounts := make([]types.Account, 0)
 	for _, key := range items {
-		accountsGetRequest := plaid.NewAccountsGetRequest(key.accessKey)
-		accountsGetResp, _, err := client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
-			*accountsGetRequest,
-		).Execute()
+		//try to get accounts from db
+		//if they don't exist (i.e. this is the first time), grab them from Plaid
+		accounts, err := db.GetAllAccounts(key.ItemKey)
 		if err != nil {
-			log.Fatal("accounts/get execute", err)
+			msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
+			log.Fatal(msg, err)
 		}
-		for _, acc := range accountsGetResp.GetAccounts() {
-			account := database.Account{Base: acc, ItemKey: key.itemKey}
-			accounts = append(accounts, account)
+		if len(accounts) == 0 {
+			//get accounts from Plaid
+			accounts, err = plaidClient.GetAllAccounts(key.AccessKey)
+			if err != nil {
+				msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
+				log.Fatal(msg, err)
+			}
+			for i := range accounts {
+				accounts[i].ItemKey = key.ItemKey
+			}
+			db.InsertAccounts(userId, accounts)
 		}
+		allAccounts = append(allAccounts, accounts...)
 	}
-
-	db.InsertAccounts(userId, accounts)
-
 	w.WriteHeader(http.StatusOK)
-	resp := map[string][]database.Account{"accounts": accounts}
+	resp := map[string][]types.Account{"accounts": allAccounts}
 	body, err := json.Marshal(resp)
 	w.Write(body)
 }
 
-func getTransactions(w http.ResponseWriter, r *http.Request) {
+/*func getTransactions(w http.ResponseWriter, r *http.Request) {
 	userIdCookie, err := r.Cookie("userId")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -246,7 +260,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		if cursor != "" {
 			request.SetCursor(cursor)
 		}
-		resp, httpResp, err := client.PlaidApi.TransactionsSync(
+		resp, httpResp, err := plaidClient.client.PlaidApi.TransactionsSync(
 			ctx,
 		).TransactionsSyncRequest(*request).Execute()
 		if err != nil {
@@ -271,7 +285,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	w.Write(json)
-}
+}*/
 
 func getBalance(w http.ResponseWriter, r *http.Request) {
 
