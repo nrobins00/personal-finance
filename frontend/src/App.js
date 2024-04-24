@@ -7,6 +7,7 @@ import {
 } from 'react-plaid-link';
 import { useEffect, useState, useCallback } from 'react';
 import TransactionDisplay from './components/TransactionDisplay';
+import { Account } from './components/Account';
 
 function App() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -77,6 +78,7 @@ function HomePage() {
             credentials: "include",
         });
         const data = await response.json()
+        setAccounts(data.accounts)
         console.log(data);
     }
 
@@ -95,6 +97,12 @@ function HomePage() {
                 </p>
                 <TransactionDisplay />
             </header>
+            <ul>
+                {accounts.map(acc => {
+                    return <Account account={acc} />
+                })
+                }
+            </ul>
         </div>
     );
 }
@@ -116,7 +124,7 @@ function LinkButton({ linkToken, setPublicToken }) {
     };
     const config = {
         onSuccess: (public_token, metadata) => { onSuccess(public_token, metadata) },
-        onExit: (err, metadata) => { },
+        onExit: (err, metadata) => { console.log("err: " + err + "; metadata: " + metadata) },
         onEvent: (eventName, metadata) => { },
         token: linkToken,
     };

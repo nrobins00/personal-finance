@@ -132,6 +132,7 @@ func createLinkToken(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	fmt.Println(json)
 	w.Write(json)
 }
 

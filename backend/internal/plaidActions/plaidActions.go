@@ -57,12 +57,15 @@ func (c *PlaidClient) ExchangePublicToken(publicToken string) (string, string) {
 
 func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) {
 	ctx := context.Background()
+	fmt.Println(accessKey)
 	accountsGetRequest := plaid.NewAccountsGetRequest(accessKey)
-	accountsGetResp, _, err := c.client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
+	accountsGetResp, resp, err := c.client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
 		*accountsGetRequest,
 	).Execute()
 	if err != nil {
-		return []types.Account{}, nil
+		fmt.Println(*resp)
+		fmt.Println(accountsGetResp)
+		return []types.Account{}, err
 	}
 	plaidAccounts := accountsGetResp.GetAccounts()
 	accounts := make([]types.Account, 0)

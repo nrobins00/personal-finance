@@ -300,7 +300,7 @@ func (db DB) GetAllItemsForUser(userId int64) ([]types.Item, error) {
 		var itemKey int
 		var accessKey, itemId string
 		var cursor sql.NullString
-		if err := rows.Scan(&itemKey, &accessKey, &itemId, &cursor); err != nil {
+		if err := rows.Scan(&itemKey, &itemId, &accessKey, &cursor); err != nil {
 			log.Fatal(err)
 		}
 		items = append(items, types.Item{
