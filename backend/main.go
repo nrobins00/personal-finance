@@ -20,6 +20,7 @@ import (
 	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/internal/plaidActions"
 	"github.com/nrobins00/personal-finance/internal/types"
+	"github.com/plaid/plaid-go/plaid"
 )
 
 func main() {
@@ -31,7 +32,7 @@ func main() {
 	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
-	//r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
 
 	r.Use(mux.CORSMethodMiddleware(r))
@@ -132,7 +133,6 @@ func createLinkToken(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(json)
 	w.Write(json)
 }
 
@@ -219,7 +219,7 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-/*func getTransactions(w http.ResponseWriter, r *http.Request) {
+func getTransactions(w http.ResponseWriter, r *http.Request) {
 	userIdCookie, err := r.Cookie("userId")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -229,21 +229,10 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
-	start := time.Now()
-	const tokenQuery string = `
-        SELECT itemId, accessKey FROM item where userId = ?
-    `
-	var accessToken string
-	err = db.QueryRow(tokenQuery, userId).Scan(&accessToken)
+	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
-
-		w.WriteHeader(http.StatusNotFound)
-		//TODO: probably shouldn't crash here
 		log.Fatal(err)
 	}
-	fmt.Println(accessToken)
-	duration := time.Since(start)
-	fmt.Println(duration)
 	ctx := context.Background()
 	var cursor string
 	var added []plaid.Transaction
@@ -251,13 +240,10 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 	var removed []plaid.RemovedTransaction
 	//var accounts []plaid.AccountBase
 	hasMore := true
-	//options := plaid.TransactionsSyncRequestOptions{
-	//    IncludePersonalFinanceCategory := true,
-	//}
 
 	for hasMore && len(added) < 10 {
 		request := plaid.NewTransactionsSyncRequest(accessToken)
-		//request.SetOptions(options)
+		//request(options)
 		if cursor != "" {
 			request.SetCursor(cursor)
 		}
@@ -286,7 +272,7 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	w.Write(json)
-}*/
+}
 
 func getBalance(w http.ResponseWriter, r *http.Request) {
 

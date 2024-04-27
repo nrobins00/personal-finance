@@ -97,12 +97,12 @@ function HomePage() {
                 </p>
                 <TransactionDisplay />
             </header>
-            <ul>
+            <div style={{ display: 'flex', gap: '90px' }}>
                 {accounts.map(acc => {
                     return <Account account={acc} />
                 })
                 }
-            </ul>
+            </div>
         </div>
     );
 }

@@ -82,3 +82,46 @@ func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) 
 	}
 	return accounts, nil
 }
+
+func (c PlaidClient) GetTransactions(accessToken, cursor string) ([]types.Transaction, string, error) {
+	ctx := context.Background()
+	oldCursor := cursor
+	var added []plaid.Transaction
+	var modified []plaid.Transaction
+	var removed []plaid.RemovedTransaction
+	//var accounts []plaid.AccountBase
+	hasMore := true
+
+	transList := make([]types.Transaction, 0)
+	for hasMore && len(added) < 10 {
+		request := plaid.NewTransactionsSyncRequest(accessToken)
+		if cursor != "" {
+			request.SetCursor(cursor)
+		}
+		resp, _, err := c.client.PlaidApi.TransactionsSync(
+			ctx,
+		).TransactionsSyncRequest(*request).Execute()
+		if err != nil {
+			return []types.Transaction{}, oldCursor, err
+			//log.Fatal(httpResp.Body)
+		}
+
+		added = append(added, resp.GetAdded()...)
+		modified = append(modified, resp.GetModified()...)
+		removed = append(removed, resp.GetRemoved()...)
+
+		hasMore = resp.GetHasMore()
+
+		cursor = resp.GetNextCursor()
+	}
+
+	for _, tr := range added {
+		transList = append(transList, types.Transaction{
+			TransactionId: tr.GetTransactionId(),
+			Amount:        tr.GetAmount(),
+			CategoryId:    tr.GetPersonalFinanceCategory().Detailed,
+		})
+	}
+
+	return transList, cursor, nil
+}

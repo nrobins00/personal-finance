@@ -130,6 +130,32 @@ func (db *DB) CreateItem(user int64, itemId string, accessKey string) (int64, er
 	return insertedId, nil
 }
 
+func (db DB) GetItemsForUser(userId int64) ([]types.Item, error) {
+	const query string = `
+        SELECT itemId, accessKey FROM item where userId = ?
+    `
+	rows, err = db.Query(query, userId)
+	if err != nil {
+		return []types.Item{}, err
+	}
+	defer rows.Close()
+	items := make([]types.Item, 0)
+	for rows.Next() {
+		var itemId, accessKey string
+		if err := rows.Scan(&itemId, &accessKey); err != nil {
+			log.Fatal(err)
+		}
+		items = append(items, types.Item{
+			ItemId:    itemId,
+			AccessKey: accessKey,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+	return items
+}
+
 func (db *DB) UpdateTransactions(itemId string, added, modified []plaid.Transaction, removed []plaid.RemovedTransaction, cursor string) error {
 	const updateCursor string = `
 		UPDATE item 

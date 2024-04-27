@@ -27,11 +27,11 @@ type Item struct {
 	Cursor    string
 }
 
-type BankTransaction struct {
+type Transaction struct {
 	TransactionKey int
-	TransactionId  int
+	TransactionId  string
 	AccountKey     int
 	Amount         float32
-	CategoryId     int
+	CategoryId     string
 	AuthorizedDttm time.Time
 }

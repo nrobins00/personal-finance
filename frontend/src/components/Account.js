@@ -2,19 +2,21 @@ import React from 'react'
 
 export function Account({ account }) {
     return (
-        <ul>
-            <li>
-                {account.Name}
-            </li>
-            <li>
-                {account.AvailableBalance}
-            </li>
-            <li>
-                {account.CurrentBalance}
-            </li>
-            <li>
-                {account.Mask}
-            </li>
-        </ul>
+        <div style={{ border: 'solid' }}>
+            <p>{account.Name}</p>
+            <ul>
+                <li>
+                    Available balance: {account.AvailableBalance}
+                </li>
+                <li>
+                    Current balance: {account.CurrentBalance}
+                </li>
+                {account.Mask &&
+                    <li>
+                        Mask: {account.Mask}
+                    </li>
+                }
+            </ul>
+        </div>
     )
 }
