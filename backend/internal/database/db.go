@@ -4,102 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nrobins00/personal-finance/internal/types"
-	"github.com/plaid/plaid-go/plaid"
 )
 
 type DB struct {
 	*sql.DB
-}
-
-func CreateDatabase(filename string) *DB {
-	db, err := sql.Open("sqlite3", filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	/*const dropUserTable string = `
-		DROP TABLE IF EXISTS user;
-	`
-	if _, err := db.Exec(dropUserTable); err != nil {
-		log.Fatal(err)
-	}*/
-
-	const createUserTable string = `
-		CREATE TABLE IF NOT EXISTS user (
-			userId INTEGER NOT NULL PRIMARY KEY,
-			username TEXT NOT NULL UNIQUE,
-			password TEXT NOT NULL
-        );
-    `
-
-	if _, err := db.Exec(createUserTable); err != nil {
-		log.Fatal("createUserTable", err)
-	}
-
-	const createItemTable string = `
-            CREATE TABLE IF NOT EXISTS item (
-				itemKey INTEGER NOT NULL PRIMARY KEY,
-                itemId TEXT NOT NULL,
-                userId INTEGER NOT NULL,
-                accessKey TEXT,
-				cursor TEXT,
-                FOREIGN KEY(userId) REFERENCES user(userId)
-            );
-	`
-	if _, err := db.Exec(createItemTable); err != nil {
-		log.Fatal("createItemTable", err)
-	}
-
-	const createTransactionTable string = `
-		CREATE TABLE IF NOT EXISTS transax (
-			transactionKey INTEGER NOT NULL PRIMARY KEY,
-			transactionId TEXT NOT NULL,
-			accountKey INTEGER,
-			amount REAL,
-			categoryId INTEGER,
-			authorizedDttm TEXT,
-			FOREIGN KEY(categoryId) REFERENCES transactionCategory(categoryId),
-			FOREIGN KEY(accountKey) REFERENCES account(accountKey)
-		);
-	`
-	if _, err := db.Exec(createTransactionTable); err != nil {
-		log.Fatal("createTransactionTable", err)
-	}
-	//const createTransactionCategoryTable string = `
-	//	CREATE TABLE IF NOT EXISTS transactionCategory (
-	//		categoryId INTEGER NOT NULL PRIMARY KEY,
-	//		primary TEXT,
-	//		detailed TEXT,
-	//	);
-	//`
-
-	const createAccountTable string = `
-		CREATE TABLE IF NOT EXISTS account (
-			accountKey INTEGER NOT NULL PRIMARY KEY,
-			accountId TEXT NOT NULL,
-			userId INTEGER,
-			itemKey INTEGER,
-			mask TEXT,
-			name TEXT,
-			availableBalance REAL,
-			currentBalance REAL,
-			lastUpdatedDttm TEXT,
-			FOREIGN KEY(userId) REFERENCES user(userId),
-			FOREIGN KEY(itemKey) REFERENCES item(itemKey)
-		);
-	`
-	if _, err := db.Exec(createAccountTable); err != nil {
-		log.Fatal("createAccountTable", err)
-	}
-	return &DB{db}
 }
 
 func (db *DB) CreateUser(username string) (int64, error) {
@@ -130,73 +42,50 @@ func (db *DB) CreateItem(user int64, itemId string, accessKey string) (int64, er
 	return insertedId, nil
 }
 
-func (db DB) GetItemsForUser(userId int64) ([]types.Item, error) {
-	const query string = `
-        SELECT itemId, accessKey FROM item where userId = ?
-    `
-	rows, err = db.Query(query, userId)
-	if err != nil {
-		return []types.Item{}, err
-	}
-	defer rows.Close()
-	items := make([]types.Item, 0)
-	for rows.Next() {
-		var itemId, accessKey string
-		if err := rows.Scan(&itemId, &accessKey); err != nil {
-			log.Fatal(err)
-		}
-		items = append(items, types.Item{
-			ItemId:    itemId,
-			AccessKey: accessKey,
-		})
-	}
-	if err := rows.Err(); err != nil {
-		log.Fatal(err)
-	}
-	return items
-}
-
-func (db *DB) UpdateTransactions(itemId string, added, modified []plaid.Transaction, removed []plaid.RemovedTransaction, cursor string) error {
+func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types.Transaction, cursor string) error {
 	const updateCursor string = `
 		UPDATE item 
 		SET cursor = ?
 		WHERE itemId = ?
 	`
+	fmt.Println(itemId, " ", cursor)
 
-	_, err := db.Exec(cursor, itemId)
+	_, err := db.Exec(updateCursor, cursor, itemId)
 	if err != nil {
 		return err
 	}
 
 	const addTransaction string = `
-		INSERT INTO transaction (transactionId, accountId, amount, categoryKey, authorizedDttm)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO transax (transactionId, amount, authorizedDttm, accountKey, category)
+		VALUES
 	`
 
-	const findCategoryKey string = `
-		SELECT categoryKey
-		FROM transactionCategory
-		WHERE primaryName = ? AND detailedName = ?
-	`
-	for _, val := range added {
-		//find category key
-		category := val.GetPersonalFinanceCategory()
-		row := db.QueryRow(findCategoryKey, category.Primary, category.Detailed)
-		var catKey int
-		err := row.Scan(&catKey)
-		if err != nil {
-			log.Printf("Couldn't find category key for values %s and %s",
-				category.Primary, category.Detailed)
-		}
-		//insert transaction
-		_, err = db.Exec(addTransaction, val.GetTransactionId(), val.GetAccountId(),
-			val.GetAmount(), catKey, val.GetAuthorizedDatetime())
-
-		if err != nil {
-			log.Println(err.Error())
-			return err
-		}
+	accountKeyMap, err := db.buildAccountKeyMap(added)
+	if err != nil {
+		return err
 	}
+
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(addTransaction)
+	for ix, val := range added {
+		accountKey := accountKeyMap[val.AccountId]
+
+		valString := fmt.Sprintf("\n('%v', %v, '%v', %v, '%v')", val.TransactionId, val.Amount,
+			val.AuthorizedDttm.String(), accountKey, val.Category)
+		queryBuilder.WriteString(valString)
+
+		if ix < len(added)-1 {
+			queryBuilder.WriteString(",")
+		}
+
+	}
+	query := queryBuilder.String()
+	fmt.Println(query)
+	_, err = db.Exec(query)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -227,7 +116,7 @@ func (db *DB) GetLatestCursor(itemId string) (string, error) {
 	return retString, nil
 }
 
-func (db *DB) InsertAccounts(userId int64, accounts []types.Account) {
+func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account) {
 	if len(accounts) == 0 {
 		return
 	}
@@ -245,7 +134,7 @@ func (db *DB) InsertAccounts(userId int64, accounts []types.Account) {
 	`
 	for accountNum, acc := range accounts {
 		valueString := fmt.Sprintf("('%s', %d, %d, '%s', '%s', %f, %f, '%s')",
-			acc.AccountId, userId, acc.ItemKey, acc.Mask, acc.Name,
+			acc.AccountId, userId, itemKey, acc.Mask, acc.Name,
 			acc.AvailableBalance, acc.CurrentBalance,
 			acc.LastUpdatedDttm.String())
 		query += valueString
@@ -324,16 +213,16 @@ func (db DB) GetAllItemsForUser(userId int64) ([]types.Item, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var itemKey int
-		var accessKey, itemId string
+		var accessToken, itemId string
 		var cursor sql.NullString
-		if err := rows.Scan(&itemKey, &itemId, &accessKey, &cursor); err != nil {
+		if err := rows.Scan(&itemKey, &itemId, &accessToken, &cursor); err != nil {
 			log.Fatal(err)
 		}
 		items = append(items, types.Item{
-			ItemKey:   itemKey,
-			ItemId:    itemId,
-			AccessKey: accessKey,
-			Cursor:    cursor.String,
+			ItemKey:     itemKey,
+			ItemId:      itemId,
+			AccessToken: accessToken,
+			Cursor:      cursor.String,
 		})
 	}
 
@@ -341,4 +230,64 @@ func (db DB) GetAllItemsForUser(userId int64) ([]types.Item, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]int, error) {
+	const selectAccountKeys string = `
+		SELECT accountKey, accountId
+		FROM account
+		WHERE accountId in (?)
+	`
+
+	accountKeyMap := make(map[string]int)
+	for _, val := range transactions {
+		accountKeyMap[val.AccountId] = 0
+	}
+
+	var accountIdSb strings.Builder
+	for key := range accountKeyMap {
+		accountIdSb.WriteString(key)
+	}
+
+	rows, err := db.Query(selectAccountKeys, accountIdSb.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var accountKey int
+		var accountId string
+		if err := rows.Scan(&accountKey, &accountId); err != nil {
+			return nil, err
+		}
+		accountKeyMap[accountId] = accountKey
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return accountKeyMap, nil
+}
+
+func (db DB) GetBudget(userId int) (float32, error) {
+	const budgetQuery string = `
+		SELECT amount FROM budget
+		WHERE userId = ?
+	`
+	var amount float32
+	row := db.QueryRow(budgetQuery, userId)
+	err := row.Scan(&amount)
+	if err != nil {
+		return 0, err
+	}
+	return amount, nil
+}
+
+func (db DB) InsertBudget(userId int, amount float32) error {
+	const insertQuery string = `
+		INSERT INTO budget (userId, amount)
+		VALUES (?, ?);
+	`
+	_, err := db.Exec(insertQuery, userId, amount)
+	return err
 }

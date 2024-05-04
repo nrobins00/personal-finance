@@ -76,24 +76,27 @@ func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) 
 			CurrentBalance:   plaidAcc.Balances.GetCurrent(),
 			Mask:             plaidAcc.GetMask(),
 			Name:             plaidAcc.GetName(),
-			ItemKey:          0,
 		}
 		accounts = append(accounts, acc)
 	}
 	return accounts, nil
 }
 
-func (c PlaidClient) GetTransactions(accessToken, cursor string) ([]types.Transaction, string, error) {
+func (c PlaidClient) GetTransactions(accessToken, cursor string) (
+	add []types.Transaction,
+	mod []types.Transaction,
+	rem []types.Transaction,
+	newCursor string,
+	err error,
+) {
 	ctx := context.Background()
 	oldCursor := cursor
 	var added []plaid.Transaction
 	var modified []plaid.Transaction
 	var removed []plaid.RemovedTransaction
-	//var accounts []plaid.AccountBase
 	hasMore := true
 
-	transList := make([]types.Transaction, 0)
-	for hasMore && len(added) < 10 {
+	for hasMore {
 		request := plaid.NewTransactionsSyncRequest(accessToken)
 		if cursor != "" {
 			request.SetCursor(cursor)
@@ -102,8 +105,8 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) ([]types.Transa
 			ctx,
 		).TransactionsSyncRequest(*request).Execute()
 		if err != nil {
-			return []types.Transaction{}, oldCursor, err
-			//log.Fatal(httpResp.Body)
+			log.Fatal(err)
+			return add, mod, rem, oldCursor, err
 		}
 
 		added = append(added, resp.GetAdded()...)
@@ -115,13 +118,32 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) ([]types.Transa
 		cursor = resp.GetNextCursor()
 	}
 
+	add = make([]types.Transaction, 0)
 	for _, tr := range added {
-		transList = append(transList, types.Transaction{
+		add = append(add, types.Transaction{
 			TransactionId: tr.GetTransactionId(),
 			Amount:        tr.GetAmount(),
-			CategoryId:    tr.GetPersonalFinanceCategory().Detailed,
+			Category:      tr.GetPersonalFinanceCategory().Detailed,
+			AccountId:     tr.GetAccountId(),
 		})
 	}
 
-	return transList, cursor, nil
+	mod = make([]types.Transaction, 0)
+	for _, tr := range modified {
+		mod = append(mod, types.Transaction{
+			TransactionId: tr.GetTransactionId(),
+			Amount:        tr.GetAmount(),
+			Category:      tr.GetPersonalFinanceCategory().Detailed,
+			AccountId:     tr.GetAccountId(),
+		})
+	}
+
+	rem = make([]types.Transaction, 0)
+	for _, tr := range removed {
+		rem = append(rem, types.Transaction{
+			TransactionId: tr.GetTransactionId(),
+		})
+	}
+
+	return add, mod, rem, cursor, nil
 }

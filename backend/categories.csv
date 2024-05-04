@@ -1,4 +1,4 @@
-categoryId,primaryName,detailedName,description
+categoryKey,primaryName,detailedName,description
 1,INCOME,INCOME_DIVIDENDS,Dividends from investment accounts
 2,INCOME,INCOME_INTEREST_EARNED,Income from interest on savings accounts
 3,INCOME,INCOME_RETIREMENT_PENSION,Income from pension payments 

@@ -16,22 +16,26 @@ type Account struct {
 	CurrentBalance   float32
 	Mask             string
 	Name             string
-	ItemKey          int
 	LastUpdatedDttm  time.Time
 }
 
 type Item struct {
-	ItemKey   int
-	ItemId    string
-	AccessKey string
-	Cursor    string
+	ItemKey     int
+	ItemId      string
+	AccessToken string
+	Cursor      string
 }
 
 type Transaction struct {
-	TransactionKey int
 	TransactionId  string
-	AccountKey     int
+	AccountId      string
 	Amount         float32
-	CategoryId     string
+	Category       string
 	AuthorizedDttm time.Time
+}
+
+type Budget struct {
+	BudgetKey int
+	UserId    string
+	Amount    float32
 }

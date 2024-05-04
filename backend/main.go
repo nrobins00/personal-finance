@@ -20,7 +20,6 @@ import (
 	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/internal/plaidActions"
 	"github.com/nrobins00/personal-finance/internal/types"
-	"github.com/plaid/plaid-go/plaid"
 )
 
 func main() {
@@ -34,6 +33,8 @@ func main() {
 	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/api/budget", getBudget).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
 
 	r.Use(mux.CORSMethodMiddleware(r))
 	r.Use(CorsMiddleware)
@@ -119,7 +120,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	idCookie := fmt.Sprintf("userId=%d; SameSite=None", userId)
+	idCookie := fmt.Sprintf("userId=%d", userId)
 	w.Header().Set("Set-Cookie", idCookie)
 	w.WriteHeader(http.StatusOK)
 }
@@ -201,15 +202,12 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(accounts) == 0 {
 			//get accounts from Plaid
-			accounts, err = plaidClient.GetAllAccounts(key.AccessKey)
+			accounts, err = plaidClient.GetAllAccounts(key.AccessToken)
 			if err != nil {
 				msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
 				log.Fatal(msg, err)
 			}
-			for i := range accounts {
-				accounts[i].ItemKey = key.ItemKey
-			}
-			db.InsertAccounts(userId, accounts)
+			db.InsertAccounts(userId, key.ItemKey, accounts)
 		}
 		allAccounts = append(allAccounts, accounts...)
 	}
@@ -223,50 +221,42 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	userIdCookie, err := r.Cookie("userId")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 	userId, err := strconv.ParseInt(userIdCookie.Value, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
+	fmt.Println(userId)
 	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ctx := context.Background()
-	var cursor string
-	var added []plaid.Transaction
-	var modified []plaid.Transaction
-	var removed []plaid.RemovedTransaction
-	//var accounts []plaid.AccountBase
-	hasMore := true
+	fmt.Println(items)
+	added := make([]types.Transaction, 0)
+	modified := make([]types.Transaction, 0)
+	removed := make([]types.Transaction, 0)
 
-	for hasMore && len(added) < 10 {
-		request := plaid.NewTransactionsSyncRequest(accessToken)
-		//request(options)
-		if cursor != "" {
-			request.SetCursor(cursor)
-		}
-		resp, httpResp, err := plaidClient.client.PlaidApi.TransactionsSync(
-			ctx,
-		).TransactionsSyncRequest(*request).Execute()
+	for _, item := range items {
+		add, mod, rem, newcursor, err := plaidClient.GetTransactions(item.AccessToken, item.Cursor)
 		if err != nil {
-			log.Fatal(httpResp.Body)
+			log.Fatal("error getting transactions: ", err)
+		}
+		err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		added = append(added, resp.GetAdded()...)
-		modified = append(modified, resp.GetModified()...)
-		removed = append(removed, resp.GetRemoved()...)
-
-		hasMore = resp.GetHasMore()
-
-		cursor = resp.GetNextCursor()
+		added = append(added, add...)
+		modified = append(modified, mod...)
+		removed = append(removed, rem...)
+		fmt.Println(newcursor)
 	}
 
-	//enc := json.NewEncoder(c.Writer)
-	//db.UpdateTransactions(item)
 	fmt.Println(added, modified, removed)
-	resp := map[string][]plaid.Transaction{"added": added}
+	resp := map[string][]types.Transaction{"added": added, "modified": modified, "removed": removed}
 	json, err := json.Marshal(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -276,4 +266,72 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 func getBalance(w http.ResponseWriter, r *http.Request) {
 
+}
+
+func getBudget(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		return
+	}
+	userId, err := getUserId(r)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	budget, err := db.GetBudget(userId)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	resp := map[string]float32{"budget": budget}
+	json, err := json.Marshal(resp)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(json)
+}
+
+type BudgetRequest struct {
+	Budget string
+}
+
+func setBudget(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		return
+	}
+	userId, err := getUserId(r)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var b BudgetRequest
+
+	err = json.NewDecoder(r.Body).Decode(&b)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fmt.Printf("Budget: %v userId: %v", b.Budget, userId)
+	budget, err := strconv.ParseFloat(b.Budget, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	err = db.InsertBudget(userId, float32(budget))
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func getUserId(r *http.Request) (int, error) {
+	userIdCookie, err := r.Cookie("userId")
+	if err != nil {
+		return -1, err
+	}
+	userId, err := strconv.ParseInt(userIdCookie.Value, 10, 0)
+	if err != nil {
+		return -1, err
+	}
+	return int(userId), nil
 }
