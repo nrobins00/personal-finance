@@ -121,20 +121,22 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 	add = make([]types.Transaction, 0)
 	for _, tr := range added {
 		add = append(add, types.Transaction{
-			TransactionId: tr.GetTransactionId(),
-			Amount:        tr.GetAmount(),
-			Category:      tr.GetPersonalFinanceCategory().Detailed,
-			AccountId:     tr.GetAccountId(),
+			TransactionId:    tr.GetTransactionId(),
+			Amount:           tr.GetAmount(),
+			CategoryPrimary:  tr.GetPersonalFinanceCategory().Primary,
+			CategoryDetailed: tr.GetPersonalFinanceCategory().Detailed,
+			AccountId:        tr.GetAccountId(),
 		})
 	}
 
 	mod = make([]types.Transaction, 0)
 	for _, tr := range modified {
 		mod = append(mod, types.Transaction{
-			TransactionId: tr.GetTransactionId(),
-			Amount:        tr.GetAmount(),
-			Category:      tr.GetPersonalFinanceCategory().Detailed,
-			AccountId:     tr.GetAccountId(),
+			TransactionId:    tr.GetTransactionId(),
+			Amount:           tr.GetAmount(),
+			CategoryPrimary:  tr.GetPersonalFinanceCategory().Primary,
+			CategoryDetailed: tr.GetPersonalFinanceCategory().Detailed,
+			AccountId:        tr.GetAccountId(),
 		})
 	}
 

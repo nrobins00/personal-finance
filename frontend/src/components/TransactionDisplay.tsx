@@ -4,6 +4,10 @@ import TransactionList from "./TransactionList";
 import "./styles/TransactionDisplay.css";
 import type { Transaction } from "../types/types";
 
+type transactionsResponse = {
+  transactions: Transaction[]
+}
+
 export default function TransactionDisplay() {
   let [transactions, setTransactions] = useState<Transaction[]>([]);
   const getTransactions = async () => {
@@ -11,10 +15,11 @@ export default function TransactionDisplay() {
       method: "GET",
       credentials: "include",
     });
-    const data = await response.json();
+    const data: transactionsResponse = await response.json();
     let firstTenTrans: Transaction[] = [];
-    for (let i = 0; i < 10; i++) {
-      firstTenTrans.push(data.added?.length >= 1 ? data.added[i] : null);
+    let i = 0
+    while (i < data.transactions?.length && firstTenTrans.length < 10) {
+      firstTenTrans.push(data.transactions[i])
     }
     console.log("firstTenTrans:", firstTenTrans);
     setTransactions(firstTenTrans);

@@ -25,6 +25,7 @@ type Item = {
 type Transaction = {
 	//TransactionId  string
 	AccountId: string
+	AccountName: string
 	Amount: number
 	CategoryPrimary: string
 	CategoryDetailed: string

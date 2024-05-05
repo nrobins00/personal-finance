@@ -27,11 +27,13 @@ type Item struct {
 }
 
 type Transaction struct {
-	TransactionId  string
-	AccountId      string
-	Amount         float32
-	Category       string
-	AuthorizedDttm time.Time
+	TransactionId    string
+	AccountId        string
+	AccountName      string
+	Amount           float32
+	CategoryPrimary  string
+	CategoryDetailed string
+	AuthorizedDttm   string
 }
 
 type Budget struct {

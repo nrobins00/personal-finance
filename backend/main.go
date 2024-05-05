@@ -244,7 +244,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatal("error getting transactions: ", err)
 		}
-		err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
+		if len(add) > 0 || len(mod) > 0 || len(rem) > 0 {
+			err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
+		}
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -255,8 +257,12 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(newcursor)
 	}
 
-	fmt.Println(added, modified, removed)
-	resp := map[string][]types.Transaction{"added": added, "modified": modified, "removed": removed}
+	transactions, err := db.GetTransactionsForUser(int(userId))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp := map[string][]types.Transaction{"transactions": transactions}
 	json, err := json.Marshal(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

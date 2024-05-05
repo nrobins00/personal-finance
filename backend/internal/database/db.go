@@ -64,14 +64,22 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 	if err != nil {
 		return err
 	}
+	fmt.Println(accountKeyMap)
 
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString(addTransaction)
+	validTransactionFound := false
 	for ix, val := range added {
-		accountKey := accountKeyMap[val.AccountId]
+		accountKey, found := accountKeyMap[val.AccountId]
+		if !found {
+			fmt.Printf("no account found for transaction: %+v\n", val)
+			continue
+		}
+		validTransactionFound = true
 
 		valString := fmt.Sprintf("\n('%v', %v, '%v', %v, '%v')", val.TransactionId, val.Amount,
-			val.AuthorizedDttm.String(), accountKey, val.Category)
+			val.AuthorizedDttm, //.String()
+			accountKey, val.CategoryDetailed)
 		queryBuilder.WriteString(valString)
 
 		if ix < len(added)-1 {
@@ -79,14 +87,71 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 		}
 
 	}
-	query := queryBuilder.String()
-	fmt.Println(query)
-	_, err = db.Exec(query)
-	if err != nil {
-		return err
+	if validTransactionFound {
+		query := queryBuilder.String()
+		fmt.Println(query)
+		_, err = db.Exec(query)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (db DB) GetTransactionsForUser(userId int) ([]types.Transaction, error) {
+	const transQuery string = `
+		SELECT transactionId, 
+		    amount, 
+		    category.PrimaryName, 
+		    category.detailedName, 
+		    authorizedDttm, 
+		    account.name
+		FROM transax
+		JOIN account on account.accountKey = transax.accountKey
+		JOIN item on item.itemKey = account.itemKey
+		JOIN transactionCategory category
+		    ON category.detailedName = transax.category
+		WHERE item.userId = ?
+	`
+	rows, err := db.Query(transQuery, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	transactions := make([]types.Transaction, 0)
+	for rows.Next() {
+		var (
+			transactionId    string
+			amount           float32
+			primaryCategory  string
+			detailedCategory string
+			authorizedDttm   string
+			accountName      string
+		)
+		err := rows.Scan(&transactionId,
+			&amount,
+			&primaryCategory,
+			&detailedCategory,
+			&authorizedDttm,
+			&accountName)
+		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, types.Transaction{
+			TransactionId:    transactionId,
+			Amount:           amount,
+			CategoryPrimary:  primaryCategory,
+			CategoryDetailed: detailedCategory,
+			AuthorizedDttm:   authorizedDttm,
+			AccountName:      accountName,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return transactions, nil
 }
 
 func (db *DB) GetUserId(username, password string) (int, error) {
@@ -233,23 +298,30 @@ func (db DB) GetAllItemsForUser(userId int64) ([]types.Item, error) {
 }
 
 func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]int, error) {
-	const selectAccountKeys string = `
+	const baseQuery string = `
 		SELECT accountKey, accountId
 		FROM account
-		WHERE accountId in (?)
-	`
+		WHERE accountId in (`
 
 	accountKeyMap := make(map[string]int)
 	for _, val := range transactions {
 		accountKeyMap[val.AccountId] = 0
 	}
 
-	var accountIdSb strings.Builder
+	var accountQuerySb strings.Builder
+	accountQuerySb.WriteString(baseQuery)
+	ids := make([]any, 0)
 	for key := range accountKeyMap {
-		accountIdSb.WriteString(key)
+		accountQuerySb.WriteString("?, ")
+		ids = append(ids, key)
 	}
+	accountQuery := accountQuerySb.String()
+	accountQuery = strings.TrimSuffix(accountQuery, ", ")
+	accountQuery = accountQuery + ")"
 
-	rows, err := db.Query(selectAccountKeys, accountIdSb.String())
+	fmt.Println("idString: ", accountQuery)
+
+	rows, err := db.Query(accountQuery, ids...)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +332,7 @@ func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]in
 		if err := rows.Scan(&accountKey, &accountId); err != nil {
 			return nil, err
 		}
+		fmt.Println(accountKey, " ", accountId)
 		accountKeyMap[accountId] = accountKey
 	}
 	if err := rows.Err(); err != nil {
