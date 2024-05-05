@@ -1,20 +1,22 @@
 import { useState } from "react";
 import "./styles/TransactionList.css";
+import type { Transaction } from "../types/types";
 
-function TransactionList({ transactions }) {
-  let [visibleTrans, setVisibleTrans] = useState([...transactions]);
-  let [filteredCats, setFilteredCats] = useState(new Set());
+function TransactionList(props: { transactions: Transaction[] }) {
+  let transactions = props.transactions
+  let [visibleTrans, setVisibleTrans] = useState([...transactions])
+  let [filteredCats, setFilteredCats] = useState(new Set<string>())
 
-  function filterTransactions(newFilteredCats) {
+  function filterTransactions(newFilteredCats: Set<string>) {
     let newTransactions = transactions.filter((tr) => {
-      return !newFilteredCats.has(tr.category[0]);
-    });
+      return !newFilteredCats.has(tr.CategoryPrimary)
+    })
     setVisibleTrans(newTransactions);
   }
-  function toggleCategory(category) {
+  function toggleCategory(category: string) {
     let newFilteredCats = new Set(filteredCats);
     if (filteredCats.has(category)) {
-      newFilteredCats.delete(category);
+      newFilteredCats.delete(category)
     } else {
       newFilteredCats.add(category);
     }
@@ -53,8 +55,7 @@ function TransactionList({ transactions }) {
             <li>
               <div>
                 <ul className="transaction-inner-container">
-                  <li>Name: {item.Name}</li>
-                  <li>Category: {item.CategoryId}</li>
+                  <li>Category: {item.CategoryDetailed}</li>
                   <li>Amount: {item.Amount}</li>
                 </ul>
               </div>

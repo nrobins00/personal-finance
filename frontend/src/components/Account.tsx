@@ -1,6 +1,8 @@
 import React from 'react'
+import type { Account } from '../types/types'
 
-export function Account({ account }) {
+export default function Account(props: { account: Account }) {
+    let account = props.account;
     return (
         <div style={{ border: 'solid' }}>
             <p>{account.Name}</p>

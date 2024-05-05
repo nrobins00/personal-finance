@@ -1,13 +1,16 @@
-import logo from "./logo.svg";
 import "./App.css";
 import {
   usePlaidLink,
   PlaidLinkOptions,
   PlaidLinkOnSuccess,
+  PlaidLinkOnSuccessMetadata,
+  PlaidLinkOnExitMetadata,
+  PlaidLinkOnEventMetadata,
+  PlaidLinkError,
 } from "react-plaid-link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import TransactionDisplay from "./components/TransactionDisplay";
-import { Account } from "./components/Account";
+import Account from "./components/Account";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -20,10 +23,14 @@ function App() {
   );
 }
 
-function LoginForm({ setLoggedIn }) {
+type LoginProps = {
+  setLoggedIn: React.Dispatch<React.SetStateAction<boolean>>
+}
+
+function LoginForm({ setLoggedIn }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     console.log(username + ":" + password);
 
@@ -65,10 +72,8 @@ function LoginForm({ setLoggedIn }) {
 
 function HomePage() {
   let [curBudget, setCurBudget] = useState(0.0);
-  let [budget, setBudget] = useState(0.0);
+  let [budget, setBudget] = useState("0");
   let [linkToken, setLinkToken] = useState(null);
-  let [publicToken, setPublicToken] = useState(null);
-  let [err, setErr] = useState(null);
   let [accounts, setAccounts] = useState([]);
   const fetchLinkTokenAndDoLink = async () => {
     if (linkToken) return;
@@ -84,8 +89,10 @@ function HomePage() {
       method: "GET",
       credentials: "include",
     });
-    const data = await response.json();
-    setCurBudget(parseFloat(data.budget));
+    if (response.status === 200) {
+      const data = await response.json();
+      setCurBudget(parseFloat(data.budget));
+    }
   };
   const getAllAccounts = async () => {
     const response = await fetch("http://localhost:8080/api/accounts", {
@@ -97,16 +104,18 @@ function HomePage() {
     console.log(data);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const response = fetch("http://localhost:8080/api/budget/set", {
+    let numBudget = parseFloat(budget)
+    const response = await fetch("http://localhost:8080/api/budget/set", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       credentials: "include",
-      body: JSON.stringify({ budget: budget }),
+      body: JSON.stringify({ budget: numBudget }),
     });
+    setCurBudget(numBudget)
   };
 
   useEffect(() => {
@@ -120,14 +129,14 @@ function HomePage() {
         <p>budget: {curBudget}</p>
         <form onSubmit={handleSubmit}>
           <label>
-            Enter your name:
+            Set new budget:
             <input value={budget} onChange={(e) => setBudget(e.target.value)} />
           </label>
           <input type="submit" />
         </form>
         <p>
           {linkToken && (
-            <LinkButton linkToken={linkToken} setPublicToken={setPublicToken} />
+            <LinkButton linkToken={linkToken} />
           )}
         </p>
         <p>
@@ -144,9 +153,9 @@ function HomePage() {
   );
 }
 
-function LinkButton({ linkToken, setPublicToken }) {
+function LinkButton(props: { linkToken: string }) {
   let [accessToken, setAccessToken] = useState(null);
-  const onSuccess = async (public_token, metadata) => {
+  const onSuccess = async (public_token: string, metadata: PlaidLinkOnSuccessMetadata) => {
     const response = await fetch("http://localhost:8080/api/publicToken", {
       method: "POST",
       headers: {
@@ -159,15 +168,15 @@ function LinkButton({ linkToken, setPublicToken }) {
     console.log(data.access_token);
     setAccessToken(data.access_token);
   };
-  const config = {
-    onSuccess: (public_token, metadata) => {
+  const config: PlaidLinkOptions = {
+    onSuccess: (public_token: string, metadata: PlaidLinkOnSuccessMetadata) => {
       onSuccess(public_token, metadata);
     },
-    onExit: (err, metadata) => {
+    onExit: (err: null | PlaidLinkError, metadata: PlaidLinkOnExitMetadata) => {
       console.log("err: " + err + "; metadata: " + metadata);
     },
-    onEvent: (eventName, metadata) => {},
-    token: linkToken,
+    onEvent: (eventName: string, metadata: PlaidLinkOnEventMetadata) => { },
+    token: props.linkToken,
   };
   const { open, ready } = usePlaidLink(config);
   const clickHandler = () => {
