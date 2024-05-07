@@ -126,6 +126,7 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 			CategoryPrimary:  tr.GetPersonalFinanceCategory().Primary,
 			CategoryDetailed: tr.GetPersonalFinanceCategory().Detailed,
 			AccountId:        tr.GetAccountId(),
+			AuthorizedDttm:   tr.GetAuthorizedDate(),
 		})
 	}
 

@@ -96,6 +96,8 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 		}
 	}
 
+	//TODO: updates and deletes
+
 	return nil
 }
 
@@ -363,4 +365,23 @@ func (db DB) InsertBudget(userId int, amount float32) error {
 	`
 	_, err := db.Exec(insertQuery, userId, amount)
 	return err
+}
+
+func (db DB) GetSpendingsForLastMonth(userId int) (float32, error) {
+	const transQuery string = `
+		SELECT sum(amount)
+		FROM transax
+		JOIN account on transax.accountKey = account.accountKey
+		JOIN item on item.itemKey = account.itemKey
+		WHERE item.userId = ?
+		AND transax.authorizedDttm > DATE('now', '-1 month')
+	`
+
+	row := db.QueryRow(transQuery, userId)
+	var sum float32
+	err := row.Scan(&sum)
+	if err != nil {
+		return -1, err
+	}
+	return sum, nil
 }

@@ -73,6 +73,7 @@ function LoginForm({ setLoggedIn }: LoginProps) {
 function HomePage() {
   let [curBudget, setCurBudget] = useState(0.0);
   let [budget, setBudget] = useState("0");
+  let [spendings, setSpendings] = useState(0.0);
   let [linkToken, setLinkToken] = useState(null);
   let [accounts, setAccounts] = useState([]);
   const fetchLinkTokenAndDoLink = async () => {
@@ -94,6 +95,16 @@ function HomePage() {
       setCurBudget(parseFloat(data.budget));
     }
   };
+  const getSpending = async () => {
+    const response = await fetch("http://localhost:8080/api/spendings", {
+      method: "GET",
+      credentials: "include",
+    });
+    if (response.status === 200) {
+      const data = await response.json();
+      setSpendings(parseFloat(data.spendings));
+    }
+  }
   const getAllAccounts = async () => {
     const response = await fetch("http://localhost:8080/api/accounts", {
       method: "GET",
@@ -121,6 +132,7 @@ function HomePage() {
   useEffect(() => {
     fetchLinkTokenAndDoLink();
     getBudget();
+    getSpending();
   }, []);
 
   return (
@@ -134,6 +146,9 @@ function HomePage() {
           </label>
           <input type="submit" />
         </form>
+        <p>
+          spendings: {spendings}
+        </p>
         <p>
           {linkToken && (
             <LinkButton linkToken={linkToken} />

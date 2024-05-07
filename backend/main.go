@@ -35,6 +35,7 @@ func main() {
 	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/budget", getBudget).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/api/spendings", getSpendings).Methods(http.MethodGet, http.MethodOptions)
 
 	r.Use(mux.CORSMethodMiddleware(r))
 	r.Use(CorsMiddleware)
@@ -340,4 +341,27 @@ func getUserId(r *http.Request) (int, error) {
 		return -1, err
 	}
 	return int(userId), nil
+}
+
+func getSpendings(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		return
+	}
+	userId, err := getUserId(r)
+	if err != nil {
+		log.Fatal(err)
+		//TODO: just pass w into getUserId and write a bad status header
+	}
+
+	spendings, err := db.GetSpendingsForLastMonth(userId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.WriteHeader(http.StatusOK)
+	resp := map[string]float32{"spendings": spendings}
+	json, err := json.Marshal(resp)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w.Write(json)
 }
