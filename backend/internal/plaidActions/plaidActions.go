@@ -76,6 +76,7 @@ func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) 
 			CurrentBalance:   plaidAcc.Balances.GetCurrent(),
 			Mask:             plaidAcc.GetMask(),
 			Name:             plaidAcc.GetName(),
+			Type:             string(plaidAcc.GetType()),
 		}
 		accounts = append(accounts, acc)
 	}

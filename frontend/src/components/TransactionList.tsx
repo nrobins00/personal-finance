@@ -4,6 +4,7 @@ import type { Transaction } from "../types/types";
 
 function TransactionList(props: { transactions: Transaction[] }) {
   let transactions = props.transactions
+  console.log("updated transactionlist", transactions)
   let [visibleTrans, setVisibleTrans] = useState([...transactions])
   let [filteredCats, setFilteredCats] = useState(new Set<string>())
 
@@ -50,9 +51,9 @@ function TransactionList(props: { transactions: Transaction[] }) {
         </button>
       </div>
       <ul className="transaction-container">
-        {visibleTrans.map((item) => {
+        {transactions.map((item) => {
           return (
-            <li>
+            <li key={item.TransactionId}>
               <div>
                 <ul className="transaction-inner-container">
                   <li>Category: {item.CategoryDetailed}</li>

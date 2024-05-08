@@ -20,6 +20,7 @@ export default function TransactionDisplay() {
     let i = 0
     while (i < data.transactions?.length && firstTenTrans.length < 10) {
       firstTenTrans.push(data.transactions[i])
+      i++;
     }
     console.log("firstTenTrans:", firstTenTrans);
     setTransactions(firstTenTrans);
@@ -35,9 +36,9 @@ export default function TransactionDisplay() {
           )}
         </div>
         <div className="col">
-          {transactions.length > 0 &&
+          {transactions.length > 0 //&&
             //<CategoryPie transactions={transactions} />
-            "df"}
+          }
         </div>
       </div>
     </>

@@ -77,6 +77,7 @@ func CreateDatabase(filename string) *DB {
 			name TEXT,
 			availableBalance REAL,
 			currentBalance REAL,
+			type TEXT,
 			lastUpdatedDttm TEXT,
 			FOREIGN KEY(userId) REFERENCES user(userId),
 			FOREIGN KEY(itemKey) REFERENCES item(itemKey)

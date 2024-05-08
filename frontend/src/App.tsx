@@ -1,4 +1,4 @@
-import "./App.css";
+//import "./App.css";
 import {
   usePlaidLink,
   PlaidLinkOptions,
@@ -11,6 +11,8 @@ import {
 import { useEffect, useState, FormEvent } from "react";
 import TransactionDisplay from "./components/TransactionDisplay";
 import Account from "./components/Account";
+import BudgetUpdateForm from "./components/BudgetUpdateForm";
+
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -65,17 +67,17 @@ function LoginForm({ setLoggedIn }: LoginProps) {
           onChange={(e) => setPassword(e.target.value)}
         />
       </label>
-      <input type={"submit"} style={{ backgroundColor: "#a1eafb" }} />
+      <input type={"submit"} />
     </form>
   );
 }
 
 function HomePage() {
   let [curBudget, setCurBudget] = useState(0.0);
-  let [budget, setBudget] = useState("0");
   let [spendings, setSpendings] = useState(0.0);
   let [linkToken, setLinkToken] = useState(null);
   let [accounts, setAccounts] = useState([]);
+  let [showUpdateBudget, setShowUpdateBudget] = useState(false);
   const fetchLinkTokenAndDoLink = async () => {
     if (linkToken) return;
     const response = await fetch("http://localhost:8080/api/linktoken", {
@@ -114,20 +116,10 @@ function HomePage() {
     setAccounts(data.accounts);
     console.log(data);
   };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    let numBudget = parseFloat(budget)
-    const response = await fetch("http://localhost:8080/api/budget/set", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({ budget: numBudget }),
-    });
-    setCurBudget(numBudget)
-  };
+  const handleBudgetUpdateSubmit = (newBudget: number) => {
+    setCurBudget(newBudget)
+    setShowUpdateBudget(false)
+  }
 
   useEffect(() => {
     fetchLinkTokenAndDoLink();
@@ -138,17 +130,12 @@ function HomePage() {
   return (
     <div>
       <header>
-        <p>budget: {curBudget}</p>
-        <form onSubmit={handleSubmit}>
-          <label>
-            Set new budget:
-            <input value={budget} onChange={(e) => setBudget(e.target.value)} />
-          </label>
-          <input type="submit" />
-        </form>
-        <p>
-          spendings: {spendings}
-        </p>
+        <div style={{ display: 'flex' }}>
+          <p>budget: {curBudget}</p>
+          <button onClick={() => setShowUpdateBudget(true)}>Update Budget</button>
+          {showUpdateBudget && <BudgetUpdateForm handleBudgetUpdate={handleBudgetUpdateSubmit} />}
+        </div>
+        <p>spent: {spendings}</p>
         <p>
           {linkToken && (
             <LinkButton linkToken={linkToken} />
@@ -158,13 +145,13 @@ function HomePage() {
           <button onClick={getAllAccounts}>Get all items</button>
         </p>
         <TransactionDisplay />
-      </header>
+      </header >
       <div style={{ display: "flex", gap: "90px" }}>
         {accounts.map((acc) => {
           return <Account account={acc} />;
         })}
       </div>
-    </div>
+    </div >
   );
 }
 

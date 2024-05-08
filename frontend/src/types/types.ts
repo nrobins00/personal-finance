@@ -23,7 +23,7 @@ type Item = {
 }
 
 type Transaction = {
-	//TransactionId  string
+	TransactionId: string
 	AccountId: string
 	AccountName: string
 	Amount: number

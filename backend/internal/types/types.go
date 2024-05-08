@@ -16,6 +16,7 @@ type Account struct {
 	CurrentBalance   float32
 	Mask             string
 	Name             string
+	Type             string
 	LastUpdatedDttm  time.Time
 }
 

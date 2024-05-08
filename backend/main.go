@@ -240,6 +240,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	modified := make([]types.Transaction, 0)
 	removed := make([]types.Transaction, 0)
 
+	//TODO: replace this with webhooks
 	for _, item := range items {
 		add, mod, rem, newcursor, err := plaidClient.GetTransactions(item.AccessToken, item.Cursor)
 		if err != nil {
@@ -299,7 +300,7 @@ func getBudget(w http.ResponseWriter, r *http.Request) {
 }
 
 type BudgetRequest struct {
-	Budget string
+	Budget float32
 }
 
 func setBudget(w http.ResponseWriter, r *http.Request) {
@@ -319,12 +320,11 @@ func setBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Printf("Budget: %v userId: %v", b.Budget, userId)
-	budget, err := strconv.ParseFloat(b.Budget, 32)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = db.InsertBudget(userId, float32(budget))
+	err = db.InsertBudget(userId, b.Budget)
 	if err != nil {
 		log.Fatal(err)
 	}
