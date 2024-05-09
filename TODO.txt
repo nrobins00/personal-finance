@@ -1,6 +1,6 @@
 TODO:
 
--update personal finance categories to use detailed as PK
+- update personal finance categories to use detailed as PK
 - refactor get/save account code
 - create component(s) for displaying accounts + balances
 - create component(s) for budget display

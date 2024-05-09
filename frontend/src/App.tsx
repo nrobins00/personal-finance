@@ -1,4 +1,4 @@
-//import "./App.css";
+import "./App.css";
 import {
   usePlaidLink,
   PlaidLinkOptions,
@@ -12,15 +12,22 @@ import { useEffect, useState, FormEvent } from "react";
 import TransactionDisplay from "./components/TransactionDisplay";
 import Account from "./components/Account";
 import BudgetUpdateForm from "./components/BudgetUpdateForm";
+import BudgetSpendingPie from "./components/BudgetSpendingPie";
 
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [curPage, setCurPage] = useState('Home');
   return (
     <div className="App">
+      <div className="topnav">
+        <button className="active">Home</button>
+        <button>Accounts</button>
+        <button>Budget Config</button>
+      </div>
       <header className="App-header">
-        {loggedIn ? <HomePage /> : <LoginForm setLoggedIn={setLoggedIn} />}
       </header>
+      {loggedIn ? <HomePage /> : <LoginForm setLoggedIn={setLoggedIn} />}
     </div>
   );
 }
@@ -77,7 +84,6 @@ function HomePage() {
   let [spendings, setSpendings] = useState(0.0);
   let [linkToken, setLinkToken] = useState(null);
   let [accounts, setAccounts] = useState([]);
-  let [showUpdateBudget, setShowUpdateBudget] = useState(false);
   const fetchLinkTokenAndDoLink = async () => {
     if (linkToken) return;
     const response = await fetch("http://localhost:8080/api/linktoken", {
@@ -116,10 +122,6 @@ function HomePage() {
     setAccounts(data.accounts);
     console.log(data);
   };
-  const handleBudgetUpdateSubmit = (newBudget: number) => {
-    setCurBudget(newBudget)
-    setShowUpdateBudget(false)
-  }
 
   useEffect(() => {
     fetchLinkTokenAndDoLink();
@@ -130,11 +132,8 @@ function HomePage() {
   return (
     <div>
       <header>
-        <div style={{ display: 'flex' }}>
-          <p>budget: {curBudget}</p>
-          <button onClick={() => setShowUpdateBudget(true)}>Update Budget</button>
-          {showUpdateBudget && <BudgetUpdateForm handleBudgetUpdate={handleBudgetUpdateSubmit} />}
-        </div>
+        <BudgetSpendingPie budget={curBudget} spending={spendings} />
+        <p>budget: {curBudget}</p>
         <p>spent: {spendings}</p>
         <p>
           {linkToken && (
