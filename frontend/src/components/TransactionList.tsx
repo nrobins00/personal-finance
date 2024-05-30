@@ -56,8 +56,10 @@ function TransactionList(props: { transactions: Transaction[] }) {
             <li key={item.TransactionId}>
               <div>
                 <ul className="transaction-inner-container">
+                  <li>Account: {item.AccountName}</li>
                   <li>Category: {item.CategoryDetailed}</li>
                   <li>Amount: {item.Amount}</li>
+                  <li>Date: {item.AuthorizedDttm}</li>
                 </ul>
               </div>
             </li>

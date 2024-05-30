@@ -18,7 +18,6 @@ type Account = {
 type Item = {
 	ItemKey: number
 	ItemId: string
-	AccessToken: string
 	Cursor: string
 }
 
@@ -29,7 +28,7 @@ type Transaction = {
 	Amount: number
 	CategoryPrimary: string
 	CategoryDetailed: string
-	AuthorizedDttm: Date
+	AuthorizedDttm: string
 }
 
 //type Budget = {

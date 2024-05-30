@@ -10,6 +10,7 @@ export default function BudgetSpendingPie(props: { budget: number, spending: num
             <Pie
                 datasetIdKey='id'
                 data={{
+                    labels: ['budget', 'spending'],
                     datasets: [
                         {
                             label: 'budget',

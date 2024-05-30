@@ -115,6 +115,7 @@ func (db DB) GetTransactionsForUser(userId int) ([]types.Transaction, error) {
 		JOIN transactionCategory category
 		    ON category.detailedName = transax.category
 		WHERE item.userId = ?
+		AND transax.authorizedDttm > DATE('now', '-1 month')
 	`
 	rows, err := db.Query(transQuery, userId)
 	if err != nil {

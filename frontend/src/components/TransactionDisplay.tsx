@@ -18,7 +18,7 @@ export default function TransactionDisplay() {
     const data: transactionsResponse = await response.json();
     let firstTenTrans: Transaction[] = [];
     let i = 0
-    while (i < data.transactions?.length && firstTenTrans.length < 10) {
+    while (i < data.transactions?.length) { //&& firstTenTrans.length < 10) {
       firstTenTrans.push(data.transactions[i])
       i++;
     }

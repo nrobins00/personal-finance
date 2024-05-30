@@ -1,33 +1,52 @@
 import "./App.css";
-import {
-  usePlaidLink,
-  PlaidLinkOptions,
-  PlaidLinkOnSuccess,
-  PlaidLinkOnSuccessMetadata,
-  PlaidLinkOnExitMetadata,
-  PlaidLinkOnEventMetadata,
-  PlaidLinkError,
-} from "react-plaid-link";
 import { useEffect, useState, FormEvent } from "react";
 import TransactionDisplay from "./components/TransactionDisplay";
-import Account from "./components/Account";
 import BudgetUpdateForm from "./components/BudgetUpdateForm";
 import BudgetSpendingPie from "./components/BudgetSpendingPie";
+import AccountListDisplay from "./components/AccountListDisplay";
+import { getCookieValue } from "./utils/utils";
 
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [curPage, setCurPage] = useState('Home');
+  useEffect(() => {
+    let userId = getCookieValue(document.cookie, "userId");
+    console.log(userId);
+    if (userId != null) {
+      setLoggedIn(true);
+    }
+  }, [])
   return (
     <div className="App">
       <div className="topnav">
-        <button className="active">Home</button>
-        <button>Accounts</button>
-        <button>Budget Config</button>
+        <button
+          className={curPage === 'Home' && "active" || ""}
+          onClick={() => { setCurPage('Home') }}
+        >
+          Home
+        </button>
+        <button
+          className={curPage === 'Accounts' && "active" || ""}
+          onClick={() => { setCurPage('Accounts') }}
+        >
+          Accounts
+        </button>
+        <button
+          className={curPage === 'Budget' && "active" || ""}
+          onClick={() => { setCurPage('Budget') }}
+        >Budget Config
+        </button>
       </div>
       <header className="App-header">
       </header>
-      {loggedIn ? <HomePage /> : <LoginForm setLoggedIn={setLoggedIn} />}
+      {loggedIn ?
+        (curPage === 'Home' && <HomePage />) ||
+        (curPage === 'Accounts' && <AccountListDisplay />) ||
+        (curPage === 'Budget' &&
+          <BudgetUpdateForm handleBudgetUpdate={(num) => console.log(num)} />)
+
+        : <LoginForm setLoggedIn={setLoggedIn} />}
     </div>
   );
 }
@@ -82,17 +101,6 @@ function LoginForm({ setLoggedIn }: LoginProps) {
 function HomePage() {
   let [curBudget, setCurBudget] = useState(0.0);
   let [spendings, setSpendings] = useState(0.0);
-  let [linkToken, setLinkToken] = useState(null);
-  let [accounts, setAccounts] = useState([]);
-  const fetchLinkTokenAndDoLink = async () => {
-    if (linkToken) return;
-    const response = await fetch("http://localhost:8080/api/linktoken", {
-      method: "POST",
-    });
-    const data = await response.json();
-    console.log(data.link_token);
-    setLinkToken(data.link_token);
-  };
   const getBudget = async () => {
     const response = await fetch("http://localhost:8080/api/budget", {
       method: "GET",
@@ -113,18 +121,8 @@ function HomePage() {
       setSpendings(parseFloat(data.spendings));
     }
   }
-  const getAllAccounts = async () => {
-    const response = await fetch("http://localhost:8080/api/accounts", {
-      method: "GET",
-      credentials: "include",
-    });
-    const data = await response.json();
-    setAccounts(data.accounts);
-    console.log(data);
-  };
 
   useEffect(() => {
-    fetchLinkTokenAndDoLink();
     getBudget();
     getSpending();
   }, []);
@@ -135,62 +133,11 @@ function HomePage() {
         <BudgetSpendingPie budget={curBudget} spending={spendings} />
         <p>budget: {curBudget}</p>
         <p>spent: {spendings}</p>
-        <p>
-          {linkToken && (
-            <LinkButton linkToken={linkToken} />
-          )}
-        </p>
-        <p>
-          <button onClick={getAllAccounts}>Get all items</button>
-        </p>
         <TransactionDisplay />
       </header >
-      <div style={{ display: "flex", gap: "90px" }}>
-        {accounts.map((acc) => {
-          return <Account account={acc} />;
-        })}
-      </div>
     </div >
   );
 }
 
-function LinkButton(props: { linkToken: string }) {
-  let [accessToken, setAccessToken] = useState(null);
-  const onSuccess = async (public_token: string, metadata: PlaidLinkOnSuccessMetadata) => {
-    const response = await fetch("http://localhost:8080/api/publicToken", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ Public_token: public_token }),
-      credentials: "include",
-    });
-    const data = await response.json();
-    console.log(data.access_token);
-    setAccessToken(data.access_token);
-  };
-  const config: PlaidLinkOptions = {
-    onSuccess: (public_token: string, metadata: PlaidLinkOnSuccessMetadata) => {
-      onSuccess(public_token, metadata);
-    },
-    onExit: (err: null | PlaidLinkError, metadata: PlaidLinkOnExitMetadata) => {
-      console.log("err: " + err + "; metadata: " + metadata);
-    },
-    onEvent: (eventName: string, metadata: PlaidLinkOnEventMetadata) => { },
-    token: props.linkToken,
-  };
-  const { open, ready } = usePlaidLink(config);
-  const clickHandler = () => {
-    if (ready) {
-      open();
-    }
-  };
-  return (
-    <>
-      <button onClick={clickHandler}>Link your bank</button>
-      {accessToken}
-    </>
-  );
-}
 
 export default App;

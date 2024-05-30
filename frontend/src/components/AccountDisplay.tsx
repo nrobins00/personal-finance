@@ -1,8 +1,9 @@
 import React from 'react'
 import type { Account } from '../types/types'
 
-export default function Account(props: { account: Account }) {
+export default function AccountDisplay(props: { account: Account }) {
     let account = props.account;
+    console.log("account here")
     return (
         <div style={{ border: 'solid' }}>
             <p>{account.Name}</p>

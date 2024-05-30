@@ -1,9 +1,11 @@
 TODO:
 
-- update personal finance categories to use detailed as PK
 - refactor get/save account code
 - create component(s) for displaying accounts + balances
 - create component(s) for budget display
 - redo getting transactions
 - adding filter option to transaction list
 - better auth / secure storage of access key 
+
+completed: 
+- update personal finance categories to use detailed as PK
