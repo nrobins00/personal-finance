@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -25,10 +26,19 @@ import (
 func main() {
 	var wait time.Duration
 	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "duration to wait for existing connections to close")
+
+	var dir string
+
+	flag.StringVar(&dir, "dir", ".", "the directory to serve files from. Defaults to the current dir")
 	flag.Parse()
 
 	r := mux.NewRouter()
+
+	// This will serve files under http://localhost:8080/static/<filename>
+	r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
+
 	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/", templTest).Methods(http.MethodGet)
 	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
@@ -37,8 +47,11 @@ func main() {
 	r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/spendings", getSpendings).Methods(http.MethodGet, http.MethodOptions)
 
-	r.Use(mux.CORSMethodMiddleware(r))
-	r.Use(CorsMiddleware)
+	r.HandleFunc("/home/{id:[0-9]+}", homePage)
+	r.HandleFunc("/accounts/{id:[0-9]+}", accounts)
+
+	//r.Use(mux.CORSMethodMiddleware(r))
+	//r.Use(CorsMiddleware)
 
 	srv := &http.Server{
 		Addr:         "0.0.0.0:8080",
@@ -98,6 +111,88 @@ func CorsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func homePage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userIdStr := vars["id"]
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+	//fmt.Fprintf(w, "UserId: %v\n", vars["userId"])
+	spendings, err := db.GetSpendingsForLastMonth(int(userId))
+	if err != nil {
+		panic(err)
+	}
+	budget, err := db.GetBudget(int(userId))
+	if err != nil {
+		panic(err)
+	}
+	templates := template.Must(template.ParseFiles("templates/navbar.tmpl"))
+	_, err = templates.ParseFiles("templates/home.tmpl")
+	if err != nil {
+		panic(err)
+	}
+	//w.WriteHeader(200)
+	templates.ExecuteTemplate(w, "Home", struct {
+		Spent  float32
+		Budget float32
+	}{
+		Spent:  spendings,
+		Budget: budget,
+	})
+}
+
+func accounts(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userIdStr := vars["id"]
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	items, err := db.GetAllItemsForUser(userId)
+	if err != nil {
+		log.Fatal("error geting items: ", err)
+	}
+	allAccounts := make([]types.Account, 0)
+	for _, key := range items {
+		//try to get accounts from db
+		//if they don't exist (i.e. this is the first time), grab them from Plaid
+		accounts, err := db.GetAllAccounts(key.ItemKey)
+		if err != nil {
+			msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
+			log.Fatal(msg, err)
+		}
+		if len(accounts) == 0 {
+			//get accounts from Plaid
+			accounts, err = plaidClient.GetAllAccounts(key.AccessToken)
+			if err != nil {
+				msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
+				log.Fatal(msg, err)
+			}
+			db.InsertAccounts(userId, key.ItemKey, accounts)
+		}
+		allAccounts = append(allAccounts, accounts...)
+	}
+
+	fmt.Println(len(allAccounts))
+
+	tmpl, err := template.ParseFiles("templates/accounts.tmpl")
+	if err != nil {
+		panic(err)
+	}
+	w.WriteHeader(200)
+	tmpl.Execute(w, struct {
+		UserId   int
+		Accounts []types.Account
+	}{
+		UserId:   int(userId),
+		Accounts: allAccounts,
+	})
+}
+
 func signin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		return
@@ -126,6 +221,17 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func templTest(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("views/link.html")
+	if err != nil {
+		panic(err)
+	}
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func createLinkToken(w http.ResponseWriter, r *http.Request) {
 	linkToken := plaidClient.GetLinkToken()
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -143,7 +249,7 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userIdCookie, err := r.Cookie("userId")
-	if err != nil {
+	if err != nil || userIdCookie == nil {
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 	userIdString := userIdCookie.Value

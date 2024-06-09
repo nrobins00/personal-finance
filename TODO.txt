@@ -1,5 +1,10 @@
 TODO:
 
+transition to server-side rendering:
+- home page + navbar
+-
+- move authentication into middleware
+
 - refactor get/save account code
 - create component(s) for displaying accounts + balances
 - create component(s) for budget display

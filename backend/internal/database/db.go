@@ -370,7 +370,7 @@ func (db DB) InsertBudget(userId int, amount float32) error {
 
 func (db DB) GetSpendingsForLastMonth(userId int) (float32, error) {
 	const transQuery string = `
-		SELECT sum(amount)
+		SELECT coalesce(sum(amount), 0)
 		FROM transax
 		JOIN account on transax.accountKey = account.accountKey
 		JOIN item on item.itemKey = account.itemKey
