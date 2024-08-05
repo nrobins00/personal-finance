@@ -35,10 +35,11 @@ func main() {
 	r := mux.NewRouter()
 
 	// This will serve files under http://localhost:8080/static/<filename>
-	r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
+	//r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
 
+	//r.Handle("/", http.FileServer(http.Dir("./static/")))
+	r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/", templTest).Methods(http.MethodGet)
 	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
@@ -128,19 +129,25 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	templates := template.Must(template.ParseFiles("templates/navbar.tmpl"))
+	transactions, err := db.GetTransactionsForUser(int(userId), 10, 0)
+	templates := template.Must(template.ParseFiles("templates/navbar.tmpl", "templates/transactions.tmpl"))
 	_, err = templates.ParseFiles("templates/home.tmpl")
 	if err != nil {
 		panic(err)
 	}
-	//w.WriteHeader(200)
-	templates.ExecuteTemplate(w, "Home", struct {
-		Spent  float32
-		Budget float32
+	w.WriteHeader(200)
+	err = templates.ExecuteTemplate(w, "Home", struct {
+		Spent        float32
+		Budget       float32
+		Transactions []types.Transaction
 	}{
-		Spent:  spendings,
-		Budget: budget,
+		Spent:        spendings,
+		Budget:       budget,
+		Transactions: transactions,
 	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 func accounts(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +229,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 }
 
 func templTest(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("views/link.html")
+	tmpl, err := template.ParseFiles("static/link.html")
 	if err != nil {
 		panic(err)
 	}
@@ -365,7 +372,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(newcursor)
 	}
 
-	transactions, err := db.GetTransactionsForUser(int(userId))
+	transactions, err := db.GetTransactionsForUser(int(userId), 0, 0)
 	if err != nil {
 		log.Fatal(err)
 	}

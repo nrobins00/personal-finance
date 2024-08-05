@@ -5,7 +5,7 @@ Requirements:
     - should compare expenditures to budget
     - send notifications when within range of exceeding budget
 - allow categorization of transactions
-- display transactions in a digestible format (probably graphs)
+- display transactions in a digestible format (maybe graphs)
     - break transactions down by category 
     - display expenditures as a percentage of budget 
 

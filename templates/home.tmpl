@@ -12,6 +12,9 @@
 		{{template "Navbar" "home"}}
 		<p>budget: {{.Budget}}</p>
 		<p>spent: {{.Spent}}</p>
+		<hr>
+		{{template "Transactions" .}}
+		<a href="/accounts/2">See all transactions</a>
 	</body>
 </html>
 {{end}}

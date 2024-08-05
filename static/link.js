@@ -16,7 +16,7 @@ const linkTokenResp = fetch("http://localhost:8080/api/linktoken", {
 	});
 
 async function exchangePublicToken(public_token, metadata) {
-	const response = await fetch("http://localhost:8080/api/publicToken", {
+	const response = await fetch("http://172.27.29.47:8080/api/publicToken", { // TODO: figure out how to handle IP
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
