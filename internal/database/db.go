@@ -101,7 +101,7 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 	return nil
 }
 
-func (db DB) GetTransactionsForUser(userId int) ([]types.Transaction, error) {
+func (db DB) GetTransactionsForUser(userId int, limit int, offset int) ([]types.Transaction, error) {
 	const transQuery string = `
 		SELECT transactionId, 
 		    amount, 
@@ -115,9 +115,17 @@ func (db DB) GetTransactionsForUser(userId int) ([]types.Transaction, error) {
 		JOIN transactionCategory category
 		    ON category.detailedName = transax.category
 		WHERE item.userId = ?
-		AND transax.authorizedDttm > DATE('now', '-1 month')
+		--AND transax.authorizedDttm > DATE('now', '-1 month')
 	`
-	rows, err := db.Query(transQuery, userId)
+	var rows *sql.Rows
+	var err error
+	if limit > 0 {
+		limitQuery := transQuery + "\nLIMIT ? OFFSET ?"
+		rows, err = db.Query(limitQuery, userId, limit, offset)
+
+	} else {
+		rows, err = db.Query(transQuery, userId)
+	}
 	if err != nil {
 		return nil, err
 	}
