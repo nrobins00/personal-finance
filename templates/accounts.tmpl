@@ -1,3 +1,4 @@
+{{define "Accounts"}}
 <!DOCTYPE html>
 <html lang="en">
 	<head>
@@ -8,11 +9,7 @@
 		<link rel="stylesheet" href="/static/navbar.css">
 	</head>
 	<body>
-		<div class="topnav">
-		  <a href="/home/{{.UserId}}">Home</a>
-		  <a class="active" href="/accounts">Accounts</a>
-		  <a href="/budget">Budget</a>
-		</div> 
+		{{template "Navbar" .}}
 		{{range .Accounts}}
 			<div>
 				<p>accountId: {{.AccountId}}</p>
@@ -22,3 +19,4 @@
 		{{end}}
 	</body>
 </html>
+{{end}}

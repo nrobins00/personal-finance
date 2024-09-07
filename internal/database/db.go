@@ -14,12 +14,12 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) CreateUser(username string) (int64, error) {
+func (db *DB) CreateUser(username string, password string) (int64, error) {
 	const createUser = `
 		INSERT INTO user (username, password)
 		VALUES (?, ?)
 	`
-	result, err := db.Exec(createUser, username, "x")
+	result, err := db.Exec(createUser, username, password)
 	if err != nil {
 		return -1, err
 	}
@@ -43,14 +43,20 @@ func (db *DB) CreateItem(user int64, itemId string, accessKey string) (int64, er
 }
 
 func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types.Transaction, cursor string) error {
+
 	const updateCursor string = `
 		UPDATE item 
 		SET cursor = ?
 		WHERE itemId = ?
 	`
-	fmt.Println(itemId, " ", cursor)
 
-	_, err := db.Exec(updateCursor, cursor, itemId)
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = db.Exec(updateCursor, cursor, itemId)
 	if err != nil {
 		return err
 	}
@@ -64,7 +70,6 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 	if err != nil {
 		return err
 	}
-	fmt.Println(accountKeyMap)
 
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString(addTransaction)
@@ -89,7 +94,6 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 	}
 	if validTransactionFound {
 		query := queryBuilder.String()
-		fmt.Println(query)
 		_, err = db.Exec(query)
 		if err != nil {
 			return err
@@ -97,6 +101,8 @@ func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types
 	}
 
 	//TODO: updates and deletes
+
+	tx.Commit()
 
 	return nil
 }
@@ -192,9 +198,9 @@ func (db *DB) GetLatestCursor(itemId string) (string, error) {
 	return retString, nil
 }
 
-func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account) {
+func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account) error {
 	if len(accounts) == 0 {
-		return
+		return fmt.Errorf("No accounts passed")
 	}
 	query := `
 		INSERT INTO account (
@@ -220,10 +226,19 @@ func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account
 	}
 	fmt.Println(query)
 
-	_, err := db.Exec(query)
+	tx, err := db.Begin()
 	if err != nil {
-		log.Fatal("insert accounts", err)
+		return err
 	}
+	defer tx.Rollback()
+
+	_, err = db.Exec(query)
+	if err != nil {
+		return err
+	}
+
+	tx.Commit()
+	return nil
 }
 
 /*
@@ -314,15 +329,15 @@ func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]in
 		FROM account
 		WHERE accountId in (`
 
-	accountKeyMap := make(map[string]int)
+	accountIds := make(map[string]bool)
 	for _, val := range transactions {
-		accountKeyMap[val.AccountId] = 0
+		accountIds[val.AccountId] = true
 	}
 
 	var accountQuerySb strings.Builder
 	accountQuerySb.WriteString(baseQuery)
 	ids := make([]any, 0)
-	for key := range accountKeyMap {
+	for key := range accountIds {
 		accountQuerySb.WriteString("?, ")
 		ids = append(ids, key)
 	}
@@ -336,7 +351,9 @@ func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]in
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
+	accountKeyIdMap := make(map[string]int)
 	for rows.Next() {
 		var accountKey int
 		var accountId string
@@ -344,13 +361,13 @@ func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]in
 			return nil, err
 		}
 		fmt.Println(accountKey, " ", accountId)
-		accountKeyMap[accountId] = accountKey
+		accountKeyIdMap[accountId] = accountKey
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return accountKeyMap, nil
+	return accountKeyIdMap, nil
 }
 
 func (db DB) GetBudget(userId int) (float32, error) {

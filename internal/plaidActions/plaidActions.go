@@ -57,7 +57,6 @@ func (c *PlaidClient) ExchangePublicToken(publicToken string) (string, string) {
 
 func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) {
 	ctx := context.Background()
-	fmt.Println(accessKey)
 	accountsGetRequest := plaid.NewAccountsGetRequest(accessKey)
 	accountsGetResp, resp, err := c.client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
 		*accountsGetRequest,
@@ -109,7 +108,6 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 			log.Fatal(err)
 			return add, mod, rem, oldCursor, err
 		}
-
 		added = append(added, resp.GetAdded()...)
 		modified = append(modified, resp.GetModified()...)
 		removed = append(removed, resp.GetRemoved()...)

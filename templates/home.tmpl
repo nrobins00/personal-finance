@@ -9,12 +9,14 @@
 		<link rel="stylesheet" href="/static/navbar.css">
 	</head>
 	<body>
-		{{template "Navbar" "home"}}
+		{{template "Navbar" .}}
 		<p>budget: {{.Budget}}</p>
 		<p>spent: {{.Spent}}</p>
 		<hr>
 		{{template "Transactions" .}}
-		<a href="/accounts/2">See all transactions</a>
+		{{if .MoreTransactions}}
+		<a href="/home/{{.UserId}}?allTransactions=true">See all transactions</a>
+		{{end}}
 	</body>
 </html>
 {{end}}

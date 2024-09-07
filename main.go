@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	b64 "encoding/base64"
 	"encoding/json"
 	"flag"
@@ -35,30 +36,33 @@ func main() {
 	r := mux.NewRouter()
 
 	// This will serve files under http://localhost:8080/static/<filename>
-	//r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
+	r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
 
 	//r.Handle("/", http.FileServer(http.Dir("./static/")))
 	r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/publicToken", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
-	r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
+	//r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
+	//r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/budget", getBudget).Methods(http.MethodGet, http.MethodOptions)
 	r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/spendings", getSpendings).Methods(http.MethodGet, http.MethodOptions)
 
 	r.HandleFunc("/home/{id:[0-9]+}", homePage)
 	r.HandleFunc("/accounts/{id:[0-9]+}", accounts)
+	r.HandleFunc("/link/{id:[0-9]+}", linkBank)
+	r.HandleFunc("/new", newUser).Methods("GET")
+	r.HandleFunc("/new", newUserPost).Methods("POST")
+	r.HandleFunc("/api/publicToken/{id:[0-9]+}", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
 
 	//r.Use(mux.CORSMethodMiddleware(r))
 	//r.Use(CorsMiddleware)
 
 	srv := &http.Server{
 		Addr:         "0.0.0.0:8080",
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+		WriteTimeout: 0, //time.Second * 15,
+		ReadTimeout:  0, //time.Second * 15,
+		IdleTimeout:  0, //time.Second * 60,
 		Handler:      r,
 	}
 	go func() {
@@ -112,38 +116,83 @@ func CorsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func newUser(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "static/signup.html")
+}
+
+func newUserPost(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	r.Form.Get("nonexistent")
+	username := r.Form.Get("username")
+	pass := r.Form.Get("pass")
+	//TODO: validate username and pass
+	//TODO: hash password?
+	userId, err := db.CreateUser(username, pass)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	idCookie := fmt.Sprintf("userId=%d", userId)
+	w.Header().Set("Set-Cookie", idCookie)
+	w.WriteHeader(http.StatusOK)
+}
+
 func homePage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userIdStr := vars["id"]
 	userId, err := strconv.ParseInt(userIdStr, 10, 64)
 	if err != nil {
+		//TODO: redirect to new user or sign in page
 		w.WriteHeader(404)
 		return
 	}
+	query := r.URL.Query()
+	allTransactionsSlice := query["allTransactions"]
+	allTransactions := false
+	if len(allTransactionsSlice) > 0 {
+		if allTransactionsSlice[0] == "true" {
+			allTransactions = true
+		}
+	}
 	//fmt.Fprintf(w, "UserId: %v\n", vars["userId"])
+	accounts, err := getAllAccounts(userId)
+	fmt.Println("Accounts: ", accounts)
+
+	transactionsLimit := 0
+	if !allTransactions {
+		transactionsLimit = 10
+	}
+	transactions, err := getTransactions(userId, transactionsLimit)
 	spendings, err := db.GetSpendingsForLastMonth(int(userId))
 	if err != nil {
 		panic(err)
 	}
 	budget, err := db.GetBudget(int(userId))
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		panic(err)
 	}
-	transactions, err := db.GetTransactionsForUser(int(userId), 10, 0)
 	templates := template.Must(template.ParseFiles("templates/navbar.tmpl", "templates/transactions.tmpl"))
 	_, err = templates.ParseFiles("templates/home.tmpl")
 	if err != nil {
 		panic(err)
 	}
 	w.WriteHeader(200)
+
 	err = templates.ExecuteTemplate(w, "Home", struct {
-		Spent        float32
-		Budget       float32
-		Transactions []types.Transaction
+		Spent            float32
+		Budget           float32
+		Transactions     []types.Transaction
+		UserId           int64
+		Page             string
+		MoreTransactions bool
 	}{
-		Spent:        spendings,
-		Budget:       budget,
-		Transactions: transactions,
+		Spent:            spendings,
+		Budget:           budget,
+		Transactions:     transactions,
+		UserId:           userId,
+		Page:             "home",
+		MoreTransactions: !allTransactions,
 	})
 	if err != nil {
 		panic(err)
@@ -185,19 +234,25 @@ func accounts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println(len(allAccounts))
-
-	tmpl, err := template.ParseFiles("templates/accounts.tmpl")
+	templates := template.Must(template.ParseFiles("templates/navbar.tmpl"))
+	_, err = templates.ParseFiles("templates/accounts.tmpl")
 	if err != nil {
 		panic(err)
 	}
 	w.WriteHeader(200)
-	tmpl.Execute(w, struct {
+	err = templates.ExecuteTemplate(w, "Accounts", struct {
 		UserId   int
 		Accounts []types.Account
+		Page     string
 	}{
 		UserId:   int(userId),
 		Accounts: allAccounts,
+		Page:     "accounts",
 	})
+
+	if err != nil {
+		panic(err)
+	}
 }
 
 func signin(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +283,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func templTest(w http.ResponseWriter, r *http.Request) {
+func linkBank(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("static/link.html")
 	if err != nil {
 		panic(err)
@@ -255,16 +310,14 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		return
 	}
-	userIdCookie, err := r.Cookie("userId")
-	if err != nil || userIdCookie == nil {
-		w.WriteHeader(http.StatusUnauthorized)
-	}
-	userIdString := userIdCookie.Value
-	userId, err := strconv.ParseInt(userIdString, 10, 64)
+	vars := mux.Vars(r)
+	userIdStr := vars["id"]
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(404)
+		return
 	}
-	//publicToken := c.Request.Body.Read()("public_token")
+
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields() //why??
 	t := struct {
@@ -274,13 +327,19 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	}
+	//TODO: make sure token exists
 	fmt.Println(t)
 	publicToken := t.Public_token
 	fmt.Printf("publicToken: %s", publicToken)
 	accessToken, itemId := plaidClient.ExchangePublicToken(publicToken)
 	fmt.Printf("userId: %d\nitemId: %s", userId, itemId)
 
-	db.CreateItem(userId, itemId, accessToken)
+	newId, err := db.CreateItem(userId, itemId, accessToken)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Print(newId)
 
 	resp := map[string]string{"access_token": accessToken}
 	json, err := json.Marshal(resp)
@@ -290,16 +349,7 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
-func getAllAccounts(w http.ResponseWriter, r *http.Request) {
-	userIdCookie, err := r.Cookie("userId")
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-	}
-	userId, err := strconv.ParseInt(userIdCookie.Value, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-
+func getAllAccounts(userId int64) ([]types.Account, error) {
 	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
 		log.Fatal("error geting items: ", err)
@@ -309,6 +359,7 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 	for _, key := range items {
 		//try to get accounts from db
 		//if they don't exist (i.e. this is the first time), grab them from Plaid
+		//TODO: you can link accounts after the initial one, so we need to always check plaid?
 		accounts, err := db.GetAllAccounts(key.ItemKey)
 		if err != nil {
 			msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
@@ -320,35 +371,21 @@ func getAllAccounts(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
 				log.Fatal(msg, err)
+				return nil, err
 			}
 			db.InsertAccounts(userId, key.ItemKey, accounts)
 		}
 		allAccounts = append(allAccounts, accounts...)
 	}
-	w.WriteHeader(http.StatusOK)
-	resp := map[string][]types.Account{"accounts": allAccounts}
-	body, err := json.Marshal(resp)
-	w.Write(body)
+	return allAccounts, nil
 }
 
-func getTransactions(w http.ResponseWriter, r *http.Request) {
-	userIdCookie, err := r.Cookie("userId")
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	userId, err := strconv.ParseInt(userIdCookie.Value, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
+func getTransactions(userId int64, limit int) ([]types.Transaction, error) {
 	fmt.Println(userId)
 	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(items)
 	added := make([]types.Transaction, 0)
 	modified := make([]types.Transaction, 0)
 	removed := make([]types.Transaction, 0)
@@ -357,32 +394,31 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	for _, item := range items {
 		add, mod, rem, newcursor, err := plaidClient.GetTransactions(item.AccessToken, item.Cursor)
 		if err != nil {
-			log.Fatal("error getting transactions: ", err)
+			return nil, err
 		}
 		if len(add) > 0 || len(mod) > 0 || len(rem) > 0 {
 			err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
+		} else {
+			fmt.Println("no transactions returned.")
 		}
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 
 		added = append(added, add...)
 		modified = append(modified, mod...)
 		removed = append(removed, rem...)
-		fmt.Println(newcursor)
+		fmt.Println("transactions: ", added, modified, removed)
+		fmt.Println("newcursor: ", newcursor)
 	}
 
-	transactions, err := db.GetTransactionsForUser(int(userId), 0, 0)
+	transactions, err := db.GetTransactionsForUser(int(userId), limit, 0)
+	fmt.Print("transaction line")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	resp := map[string][]types.Transaction{"transactions": transactions}
-	json, err := json.Marshal(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	w.Write(json)
+	return transactions, err
 }
 
 func getBalance(w http.ResponseWriter, r *http.Request) {
