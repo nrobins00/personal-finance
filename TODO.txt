@@ -1,8 +1,6 @@
 TODO:
 
 transition to server-side rendering:
-- home page + navbar
--
 - move authentication into middleware
 
 - refactor get/save account code
@@ -11,6 +9,8 @@ transition to server-side rendering:
 - redo getting transactions
 - adding filter option to transaction list
 - better auth / secure storage of access key 
+- sessions (https://pkg.go.dev/github.com/gorilla/sessions#section-readme)
+- webhooks for auto updating transaction history?
 
 completed: 
 - update personal finance categories to use detailed as PK
