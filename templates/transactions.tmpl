@@ -1,13 +1,15 @@
 {{ define "Transactions" }}
 	{{ range .Transactions }}
-	<ul>
-		<li>ID: {{.TransactionId}}</li>
-		<li>AccountId: {{.AccountId}}</li>
-		<li>AccountName: {{.AccountName}}</li>
-		<li>Amount: {{.Amount}}</li>
-		<li>Category: {{.CategoryDetailed}}</li>
-		<li>Date: {{.AuthorizedDttm}}</li>
-	</ul>
+		<div data-category="{{.CategoryDetailed}}">
+			<ul>
+				<li>ID: {{.TransactionId}}</li>
+				<li>AccountId: {{.AccountId}}</li>
+				<li>AccountName: {{.AccountName}}</li>
+				<li>Amount: {{.Amount}}</li>
+				<li>Category: {{.CategoryDetailed}}</li>
+				<li>Date: {{.AuthorizedDttm}}</li>
+			</ul>
+		</div>
 	{{ else }}
 	<p>No transactions available</p>
 	{{ end }}

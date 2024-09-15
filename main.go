@@ -186,6 +186,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		UserId           int64
 		Page             string
 		MoreTransactions bool
+		Categories       []string
 	}{
 		Spent:            spendings,
 		Budget:           budget,
@@ -193,10 +194,24 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		UserId:           userId,
 		Page:             "home",
 		MoreTransactions: !allTransactions,
+		Categories:       getAllCategoriesFromTransactions(transactions),
 	})
 	if err != nil {
 		panic(err)
 	}
+}
+
+func getAllCategoriesFromTransactions(transactions []types.Transaction) []string {
+	catSet := make(map[string]bool)
+	for _, trans := range transactions {
+		catSet[trans.CategoryDetailed] = true
+	}
+
+	catSlice := make([]string, 0, len(catSet))
+	for cat := range catSet {
+		catSlice = append(catSlice, cat)
+	}
+	return catSlice
 }
 
 func accounts(w http.ResponseWriter, r *http.Request) {
@@ -255,10 +270,20 @@ func accounts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func budget(w http.ResponseWriter, r *http.Request) {
+	//vars := mux.Vars(r)
+	//userIdStr := vars["id"]
+	//userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	//if err != nil {
+	//	w.WriteHeader(404)
+	//	return
+	//}
+}
+
 func signin(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		return
-	}
+	//if r.Method == http.MethodOptions {
+	//	return
+	//}
 	auth := r.Header.Get("Authorization")
 	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
 	if err != nil {
