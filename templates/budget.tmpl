@@ -1,4 +1,4 @@
-{{define "Home"}}
+{{ define "Budget" }}
 <!DOCTYPE html>
 <html lang="en">
 	<head>
@@ -11,14 +11,13 @@
 		<link rel="stylesheet" href="/static/transactions.css"></link>
 	</head>
 	<body>
-		{{template "Navbar" .}}
-		<p>budget: {{.Budget}}</p>
-		<p>spent: {{.Spent}}</p>
-		<hr>
-		{{template "Transactions" .}}
-		{{if .MoreTransactions}}
-		<a href="/home/{{.UserId}}?allTransactions=true">See all transactions</a>
-		{{end}}
+		<p>Current budget: {{.CurrentBudget}}</p>
+		<form method="POST">
+			<label>
+				Budget: <input type="number" name="amount"/>
+			</label>
+			<button action="submit">Submit</button>
+		</form>
 	</body>
 </html>
-{{end}}
+{{ end }}

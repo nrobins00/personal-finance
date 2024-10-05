@@ -54,6 +54,8 @@ func main() {
 	r.HandleFunc("/new", newUser).Methods("GET")
 	r.HandleFunc("/new", newUserPost).Methods("POST")
 	r.HandleFunc("/api/publicToken/{id:[0-9]+}", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/budget/{id:[0-9]+}", budget).Methods("GET")
+	r.HandleFunc("/budget/{id:[0-9]+}", updateBudget).Methods("POST")
 
 	//r.Use(mux.CORSMethodMiddleware(r))
 	//r.Use(CorsMiddleware)
@@ -271,13 +273,52 @@ func accounts(w http.ResponseWriter, r *http.Request) {
 }
 
 func budget(w http.ResponseWriter, r *http.Request) {
-	//vars := mux.Vars(r)
-	//userIdStr := vars["id"]
-	//userId, err := strconv.ParseInt(userIdStr, 10, 64)
-	//if err != nil {
-	//	w.WriteHeader(404)
-	//	return
-	//}
+	vars := mux.Vars(r)
+	userIdStr := vars["id"]
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+	budget, err := db.GetBudget(int(userId))
+	if err != nil {
+		panic(err)
+	}
+
+	templates, err := template.ParseFiles("templates/budget.tmpl")
+	if err != nil {
+		panic(err)
+	}
+
+	err = templates.ExecuteTemplate(w, "Budget", struct {
+		CurrentBudget float32
+	}{
+		CurrentBudget: budget,
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func updateBudget(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userIdStr := vars["id"]
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(404)
+		return
+	}
+
+	r.ParseForm()
+	amountStr := r.Form.Get("amount")
+	amount, err := strconv.ParseFloat(amountStr, 32)
+	if err != nil {
+		panic(err)
+	}
+
+	db.InsertBudget(int(userId), float32(amount))
+	w.Write([]byte(fmt.Sprintf("budget updated to %v", amount)))
 }
 
 func signin(w http.ResponseWriter, r *http.Request) {

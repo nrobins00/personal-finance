@@ -1,4 +1,13 @@
 {{ define "Transactions" }}
+	<div class="dropdown">
+		<button onclick="showDropdown()">Filter Categories</button>
+		<div class="dropdown-content">
+			{{range .Categories}}
+			<label><input type="checkbox" name="categories" value="{{.}}" checked>{{.}}</label>
+			{{ end }}
+		</div>
+
+	</div>
 	{{ range .Transactions }}
 		<div data-category="{{.CategoryDetailed}}">
 			<ul>
