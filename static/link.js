@@ -14,6 +14,7 @@ const linkTokenResp = fetch("http://localhost:8080/api/linktoken", {
       onLoad: () => {},
       onExit: (err, metadata) => {},
       onEvent: (eventName, metadata) => {},
+      update.user: true,
     });
   });
 

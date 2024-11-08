@@ -163,14 +163,27 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	if !allTransactions {
 		transactionsLimit = 10
 	}
-	transactions, err := getTransactions(userId, transactionsLimit)
+	transactions, err, updateTokens := getTransactions(userId, transactionsLimit)
+	if len(updateTokens) > 0 {
+		// send to route that builds and sends linkUpdate HTML
+		updateItems(w, r, updateTokens)
+		return
+	}
+	if err != nil {
+		// update link
+		//panic(err)
+		fmt.Println(err)
+	}
+
 	spendings, err := db.GetSpendingsForLastMonth(int(userId))
 	if err != nil {
-		panic(err)
+		//panic(err)
+		fmt.Println(err)
 	}
+
 	budget, err := db.GetBudget(int(userId))
 	if err != nil && err != sql.ErrNoRows {
-		panic(err)
+		fmt.Println(err)
 	}
 	templates := template.Must(template.ParseFiles("templates/navbar.tmpl", "templates/transactions.tmpl"))
 	_, err = templates.ParseFiles("templates/home.tmpl")
@@ -194,6 +207,22 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		Page:             "home",
 		MoreTransactions: !allTransactions,
 	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func updateItems(w http.ResponseWriter, r *http.Request, updateTokens []string) {
+	template, err := template.ParseFiles("templates/updateLink.tmpl")
+	if err != nil {
+		panic(err)
+	}
+	err = template.ExecuteTemplate(w, "UpdateLink", struct {
+		UpdateTokens []string
+	}{
+		UpdateTokens: updateTokens,
+	})
+
 	if err != nil {
 		panic(err)
 	}
@@ -380,7 +409,7 @@ func getAllAccounts(userId int64) ([]types.Account, error) {
 	return allAccounts, nil
 }
 
-func getTransactions(userId int64, limit int) ([]types.Transaction, error) {
+func getTransactions(userId int64, limit int) ([]types.Transaction, error, []string) {
 	fmt.Println(userId)
 	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
@@ -390,11 +419,17 @@ func getTransactions(userId int64, limit int) ([]types.Transaction, error) {
 	modified := make([]types.Transaction, 0)
 	removed := make([]types.Transaction, 0)
 
+	updateTokens := make([]string, 0)
+
 	//TODO: replace this with webhooks
 	for _, item := range items {
-		add, mod, rem, newcursor, err := plaidClient.GetTransactions(item.AccessToken, item.Cursor)
+		add, mod, rem, newcursor, err, updateToken := plaidClient.GetTransactions(item.AccessToken, item.Cursor)
+		if updateToken != "" {
+			updateTokens = append(updateTokens, updateToken)
+		}
 		if err != nil {
-			return nil, err
+			// do
+			return nil, err, nil
 		}
 		if len(add) > 0 || len(mod) > 0 || len(rem) > 0 {
 			err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
@@ -402,7 +437,7 @@ func getTransactions(userId int64, limit int) ([]types.Transaction, error) {
 			fmt.Println("no transactions returned.")
 		}
 		if err != nil {
-			return nil, err
+			return nil, err, nil
 		}
 
 		added = append(added, add...)
@@ -412,13 +447,17 @@ func getTransactions(userId int64, limit int) ([]types.Transaction, error) {
 		fmt.Println("newcursor: ", newcursor)
 	}
 
+	if len(updateTokens) > 0 {
+		return nil, nil, updateTokens
+	}
+
 	transactions, err := db.GetTransactionsForUser(int(userId), limit, 0)
 	fmt.Print("transaction line")
 	if err != nil {
 		panic(err)
 	}
 
-	return transactions, err
+	return transactions, err, nil
 }
 
 func getBalance(w http.ResponseWriter, r *http.Request) {
@@ -469,10 +508,6 @@ func setBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Printf("Budget: %v userId: %v", b.Budget, userId)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
 	err = db.InsertBudget(userId, b.Budget)
 	if err != nil {
 		log.Fatal(err)

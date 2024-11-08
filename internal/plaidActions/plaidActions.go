@@ -30,7 +30,7 @@ func (c *PlaidClient) GetLinkToken() string {
 		"Plaid Test", "en", []plaid.CountryCode{plaid.COUNTRYCODE_US},
 		user,
 	)
-	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH})
+	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH, plaid.PRODUCTS_TRANSACTIONS})
 	request.SetLinkCustomizationName("default")
 	fmt.Println(c.client)
 	resp, httpResp, err := c.client.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()
@@ -39,6 +39,22 @@ func (c *PlaidClient) GetLinkToken() string {
 		log.Fatal(err)
 	}
 	return resp.GetLinkToken()
+}
+
+func (c *PlaidClient) UpdateItem(accessToken string) (string, error) {
+	ctx := context.Background()
+	user := plaid.LinkTokenCreateRequestUser{ClientUserId: c.ClientId}
+	request := plaid.NewLinkTokenCreateRequest(
+		"Plaid Test", "en", []plaid.CountryCode{plaid.COUNTRYCODE_US},
+		user,
+	)
+	request.SetAccessToken(accessToken)
+	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH, plaid.PRODUCTS_TRANSACTIONS})
+	resp, _, err := c.client.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()
+	if err != nil {
+		return "", err
+	}
+	return resp.GetLinkToken(), nil
 }
 
 func (c *PlaidClient) ExchangePublicToken(publicToken string) (string, string) {
@@ -88,6 +104,7 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 	rem []types.Transaction,
 	newCursor string,
 	err error,
+	linkToken string,
 ) {
 	ctx := context.Background()
 	oldCursor := cursor
@@ -101,12 +118,22 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 		if cursor != "" {
 			request.SetCursor(cursor)
 		}
-		resp, _, err := c.client.PlaidApi.TransactionsSync(
+		resp, httpErr, err := c.client.PlaidApi.TransactionsSync(
 			ctx,
 		).TransactionsSyncRequest(*request).Execute()
+
 		if err != nil {
-			log.Fatal(err)
-			return add, mod, rem, oldCursor, err
+			if apiErr, ok := err.(plaid.GenericOpenAPIError); ok {
+				if data, ok := apiErr.Model().(plaid.Error); ok {
+					if data.ErrorCode == "ITEM_LOGIN_REQUIRED" || data.ErrorType == "INVALID_INPUT" {
+						// do Link update
+						linkToken, err = c.UpdateItem(accessToken)
+						return add, mod, rem, oldCursor, err, linkToken
+					}
+				}
+			}
+			fmt.Println(httpErr.Body)
+			return add, mod, rem, oldCursor, err, ""
 		}
 		added = append(added, resp.GetAdded()...)
 		modified = append(modified, resp.GetModified()...)
@@ -147,5 +174,5 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 		})
 	}
 
-	return add, mod, rem, cursor, nil
+	return add, mod, rem, cursor, nil, ""
 }

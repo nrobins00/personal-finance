@@ -1,6 +1,10 @@
 TODO:
+-figure out why 1 of the updates didn't work.
+    - might just be because I didn't give access to all the same accounts
+        -start by debugging to figure out which plaid error type it is
 
 transition to server-side rendering:
+- handle plaid/link user (save to DB or something)
 - move authentication into middleware
 
 - refactor get/save account code
