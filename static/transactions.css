@@ -1,0 +1,19 @@
+.dropdown {
+	display: inline-block;
+	position: relative;
+}
+
+.dropdown-content {
+	display: none;
+	position: absolute;
+	z-index: 1;
+	box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+	background-color: #f9f9f9;
+	min-width: 100px;
+}
+
+.dropdown-content label {
+	display: block;
+	white-space: nowrap;
+	margin-top: .2em;
+}

@@ -385,11 +385,21 @@ func (db DB) GetBudget(userId int) (float32, error) {
 }
 
 func (db DB) InsertBudget(userId int, amount float32) error {
+	const deleteQuery string = `
+		DELETE FROM budget
+		WHERE userId = ?
+	`
 	const insertQuery string = `
 		INSERT INTO budget (userId, amount)
 		VALUES (?, ?);
 	`
-	_, err := db.Exec(insertQuery, userId, amount)
+	_, err := db.Exec(deleteQuery, userId)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(insertQuery, userId, amount)
 	return err
 }
 

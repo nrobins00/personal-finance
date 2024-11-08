@@ -1,13 +1,24 @@
 {{ define "Transactions" }}
+	<div class="dropdown">
+		<button onclick="showDropdown()">Filter Categories</button>
+		<div class="dropdown-content">
+			{{range .Categories}}
+			<label><input type="checkbox" name="categories" value="{{.}}" checked>{{.}}</label>
+			{{ end }}
+		</div>
+
+	</div>
 	{{ range .Transactions }}
-	<ul>
-		<li>ID: {{.TransactionId}}</li>
-		<li>AccountId: {{.AccountId}}</li>
-		<li>AccountName: {{.AccountName}}</li>
-		<li>Amount: {{.Amount}}</li>
-		<li>Category: {{.CategoryDetailed}}</li>
-		<li>Date: {{.AuthorizedDttm}}</li>
-	</ul>
+		<div data-category="{{.CategoryDetailed}}">
+			<ul>
+				<li>ID: {{.TransactionId}}</li>
+				<li>AccountId: {{.AccountId}}</li>
+				<li>AccountName: {{.AccountName}}</li>
+				<li>Amount: {{.Amount}}</li>
+				<li>Category: {{.CategoryDetailed}}</li>
+				<li>Date: {{.AuthorizedDttm}}</li>
+			</ul>
+		</div>
 	{{ else }}
 	<p>No transactions available</p>
 	{{ end }}
