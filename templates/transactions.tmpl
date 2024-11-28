@@ -8,19 +8,25 @@
 		</div>
 
 	</div>
+	<table>
+		<tr>
+			<th class="col-date">Date</th>
+			<th class="col-account-name">Account Name</th>
+			<th class="col-category">Category</th>
+			<th class="col-amount">Amount</th>
+		</tr>
 	{{ range .Transactions }}
-		<div data-category="{{.CategoryDetailed}}">
-			<ul>
-				<li>ID: {{.TransactionId}}</li>
-				<li>AccountId: {{.AccountId}}</li>
-				<li>AccountName: {{.AccountName}}</li>
-				<li>Amount: {{.Amount}}</li>
-				<li>Category: {{.CategoryDetailed}}</li>
-				<li>Date: {{.AuthorizedDttm}}</li>
-			</ul>
-		</div>
+		<tr data-category="{{.CategoryDetailed}}">
+			<td class="col-date">{{.AuthorizedDttm}}</td>
+			<td class="col-account-name">{{.AccountName}}</td>
+			<td class="col-category">{{.CategoryDetailed}}</td>
+			<td class="col-amount">{{.Amount}}</td>
+		</tr>
 	{{ else }}
-	<p>No transactions available</p>
+		<tr>
+			<td colspan="4">No transactions available</td>
+		<tr>
 	{{ end }}
+	</table>
 {{ end }}
 
