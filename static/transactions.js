@@ -1,3 +1,5 @@
+console.log(1);
+
 function filterCategories() {
   var checkboxes = document.querySelectorAll(
     '.dropdown-content input[type="checkbox"]',
@@ -32,3 +34,19 @@ document.addEventListener("click", (event) => {
     filterCategories();
   }
 });
+
+function updateSort(sortCol) {
+  if ('URLSearchParams' in window) {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("sortCol") == sortCol) {
+      // already sorting on this col, so reverse direction
+      let oldDir = searchParams.get("sortDir");
+      let newDir = oldDir != "desc" ? "desc" : "asc";
+      searchParams.set("sortDir", newDir);
+    } else {
+      searchParams.set("sortCol", sortCol);
+      searchParams.set("sortDir", "asc");
+    }
+    window.location.search = searchParams.toString();
+  }
+}

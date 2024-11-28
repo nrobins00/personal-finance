@@ -10,10 +10,54 @@
 	</div>
 	<table>
 		<tr>
-			<th class="col-date">Date</th>
-			<th class="col-account-name">Account Name</th>
-			<th class="col-category">Category</th>
-			<th class="col-amount">Amount</th>
+			<th class="col-date" onclick="updateSort('Date')">
+				Date
+				{{if eq .SortCol "Date" }}
+					{{if eq .SortDir "desc"}}
+						<i class="fas fa-sort-down"/>
+					{{else}}
+						<i class="fas fa-sort-up"/>
+					{{end}}
+				{{ else }}
+					<i class="fas fa-sort"/>
+				{{ end }}
+			</th>
+			<th class="col-account-name" onclick="updateSort('AccountName')">
+				Account Name
+				{{if eq .SortCol "AccountName" }}
+					{{if eq .SortDir "desc"}}
+						<i class="fas fa-sort-down"/>
+					{{else}}
+						<i class="fas fa-sort-up"/>
+					{{end}}
+				{{ else }}
+					<i class="fas fa-sort"/>
+				{{ end }}
+			</th>
+			<th class="col-category" onclick="updateSort('Category')">
+				Category
+				{{if eq .SortCol "Category" }}
+					{{if eq .SortDir "desc"}}
+						<i class="fas fa-sort-down"/>
+					{{else}}
+						<i class="fas fa-sort-up"/>
+					{{end}}
+				{{ else }}
+					<i class="fas fa-sort"/>
+				{{ end }}
+			</th>
+			<th class="col-amount" onclick="updateSort('Amount')">
+				Amount
+				{{if eq .SortCol "Amount" }}
+					{{if eq .SortDir "desc"}}
+						<i class="fas fa-sort-down"/>
+					{{else}}
+						<i class="fas fa-sort-up"/>
+					{{end}}
+				{{ else }}
+					<i class="fas fa-sort"/>
+				{{ end }}
+			</th>
 		</tr>
 	{{ range .Transactions }}
 		<tr data-category="{{.CategoryDetailed}}">
