@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ func main() {
 	r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
 
 	//r.Handle("/", http.FileServer(http.Dir("./static/")))
-	r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions, http.MethodGet)
 	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
 	//r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
@@ -72,6 +73,7 @@ func main() {
 			log.Println(err)
 		}
 	}()
+	log.Println("listening at ", srv.Addr)
 
 	c := make(chan os.Signal, 1)
 
@@ -150,13 +152,30 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := r.URL.Query()
-	allTransactionsSlice := query["allTransactions"]
+
+	allTransactionsStr := query.Get("allTransactions")
 	allTransactions := false
-	if len(allTransactionsSlice) > 0 {
-		if allTransactionsSlice[0] == "true" {
-			allTransactions = true
-		}
+	if allTransactionsStr == "true" {
+		allTransactions = true
 	}
+
+	sortColStr := query.Get("sortCol")
+	var sortCol By
+	switch sortColStr {
+	case "Amount":
+		sortCol = Amount
+	case "Date":
+		sortCol = Date
+	case "Category":
+		sortCol = Category
+	case "AccountName":
+		sortCol = AccountName
+	default:
+		sortCol = nil
+	}
+
+	sortDirStr := query.Get("sortDir")
+
 	//fmt.Fprintf(w, "UserId: %v\n", vars["userId"])
 	accounts, err := getAllAccounts(userId)
 	fmt.Println("Accounts: ", accounts)
@@ -175,6 +194,18 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		// update link
 		//panic(err)
 		fmt.Println(err)
+	}
+
+	if sortCol != nil {
+		transSorter := &TransactionSorter{
+			transactions: transactions,
+			by:           sortCol,
+		}
+		if sortDirStr == "desc" {
+			sort.Sort(sort.Reverse(transSorter))
+		} else {
+			sort.Sort(transSorter)
+		}
 	}
 
 	spendings, err := db.GetSpendingsForLastMonth(int(userId))
@@ -202,6 +233,8 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		Page             string
 		MoreTransactions bool
 		Categories       []string
+		SortCol          string
+		SortDir          string
 	}{
 		Spent:            spendings,
 		Budget:           budget,
@@ -210,6 +243,8 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 		Page:             "home",
 		MoreTransactions: !allTransactions,
 		Categories:       getAllCategoriesFromTransactions(transactions),
+		SortCol:          sortColStr,
+		SortDir:          sortDirStr,
 	})
 	if err != nil {
 		panic(err)
@@ -354,6 +389,7 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	//if r.Method == http.MethodOptions {
 	//	return
 	//}
+	fmt.Println("yo")
 	auth := r.Header.Get("Authorization")
 	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
 	if err != nil {
@@ -518,7 +554,6 @@ func getTransactions(userId int64, limit int) ([]types.Transaction, error, []str
 	}
 
 	transactions, err := db.GetTransactionsForUser(int(userId), limit, 0)
-	fmt.Print("transaction line")
 	if err != nil {
 		panic(err)
 	}
