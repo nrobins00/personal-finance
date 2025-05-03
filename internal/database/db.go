@@ -42,6 +42,19 @@ func (db *DB) CreateItem(user int64, itemId string, accessKey string) (int64, er
 	return insertedId, nil
 }
 
+func (db *DB) CheckUserExists(userId int64) bool {
+	const query string = `
+		SELECT 1
+		FROM user
+		WHERE userId = ?
+	`
+
+	row := db.QueryRow(query, userId)
+	err := row.Scan()
+	fmt.Println(err)
+	return err == nil
+}
+
 func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types.Transaction, cursor string) error {
 
 	const updateCursor string = `
@@ -224,7 +237,6 @@ func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account
 			query += ", "
 		}
 	}
-	fmt.Println(query)
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -345,8 +357,6 @@ func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]in
 	accountQuery = strings.TrimSuffix(accountQuery, ", ")
 	accountQuery = accountQuery + ")"
 
-	fmt.Println("idString: ", accountQuery)
-
 	rows, err := db.Query(accountQuery, ids...)
 	if err != nil {
 		return nil, err
@@ -360,7 +370,6 @@ func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]in
 		if err := rows.Scan(&accountKey, &accountId); err != nil {
 			return nil, err
 		}
-		fmt.Println(accountKey, " ", accountId)
 		accountKeyIdMap[accountId] = accountKey
 	}
 	if err := rows.Err(); err != nil {

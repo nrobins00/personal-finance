@@ -1,0 +1,15 @@
+<!-- layout.html -->
+<html>
+    <head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    </head>
+    <body>
+        <div class="navbar">...</div>
+        <div class="content">
+            {{block "content" .}}
+                <!-- Fallback, if "content" is not defined elsewhere -->
+            {{end}}
+            <script src="/public/js/user.js"></script>
+        </div>
+    </body>
+</html>

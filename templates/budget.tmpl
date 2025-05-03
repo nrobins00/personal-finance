@@ -11,6 +11,7 @@
 		<link rel="stylesheet" href="/static/transactions.css"></link>
 	</head>
 	<body>
+		{{template "Navbar" .}}
 		<p>Current budget: {{.CurrentBudget}}</p>
 		<form method="POST">
 			<label>

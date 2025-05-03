@@ -30,9 +30,9 @@ func (c *PlaidClient) GetLinkToken() string {
 		"Plaid Test", "en", []plaid.CountryCode{plaid.COUNTRYCODE_US},
 		user,
 	)
+	request.SetWebhook("https://eocttvfeaqmdhw.m.pipedream.net")
 	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH, plaid.PRODUCTS_TRANSACTIONS})
 	request.SetLinkCustomizationName("default")
-	fmt.Println(c.client)
 	resp, httpResp, err := c.client.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()
 	if err != nil {
 		fmt.Println(httpResp.Body)
@@ -128,7 +128,8 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 					if data.ErrorCode == "ITEM_LOGIN_REQUIRED" || data.ErrorType == "INVALID_INPUT" {
 						// do Link update
 						linkToken, err = c.UpdateItem(accessToken)
-						return add, mod, rem, oldCursor, err, linkToken
+						// return nil error here because the linkToken signifies the error
+						return add, mod, rem, oldCursor, nil, linkToken
 					}
 				}
 			}

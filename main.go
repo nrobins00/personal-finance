@@ -1,21 +1,19 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	b64 "encoding/base64"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
+
 	"sort"
 	"strconv"
+
 	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -23,71 +21,87 @@ import (
 	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/internal/plaidActions"
 	"github.com/nrobins00/personal-finance/internal/types"
+	"github.com/nrobins00/personal-finance/platform/authenticator"
+	"github.com/nrobins00/personal-finance/platform/router"
 )
 
 func main() {
-	var wait time.Duration
-	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "duration to wait for existing connections to close")
+	// var wait time.Duration
+	// flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "duration to wait for existing connections to close")
 
-	var dir string
+	// var dir string
 
-	flag.StringVar(&dir, "dir", ".", "the directory to serve files from. Defaults to the current dir")
-	flag.Parse()
+	// flag.StringVar(&dir, "dir", ".", "the directory to serve files from. Defaults to the current dir")
+	// flag.Parse()
 
-	r := mux.NewRouter()
-
-	// This will serve files under http://localhost:8080/static/<filename>
-	r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
-
-	//r.Handle("/", http.FileServer(http.Dir("./static/")))
-	r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions, http.MethodGet)
-	r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
-	//r.HandleFunc("/api/transactions", getTransactions).Methods(http.MethodGet, http.MethodOptions)
-	//r.HandleFunc("/api/accounts", getAllAccounts).Methods(http.MethodGet, http.MethodOptions)
-	r.HandleFunc("/api/budget", getBudget).Methods(http.MethodGet, http.MethodOptions)
-	r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/api/spendings", getSpendings).Methods(http.MethodGet, http.MethodOptions)
-
-	r.HandleFunc("/home/{id:[0-9]+}", homePage)
-	r.HandleFunc("/accounts/{id:[0-9]+}", accounts)
-	r.HandleFunc("/link/{id:[0-9]+}", linkBank)
-	r.HandleFunc("/new", newUser).Methods("GET")
-	r.HandleFunc("/new", newUserPost).Methods("POST")
-	r.HandleFunc("/api/publicToken/{id:[0-9]+}", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc("/budget/{id:[0-9]+}", budget).Methods("GET")
-	r.HandleFunc("/budget/{id:[0-9]+}", updateBudget).Methods("POST")
-
-	//r.Use(mux.CORSMethodMiddleware(r))
-	//r.Use(CorsMiddleware)
-
-	srv := &http.Server{
-		Addr:         "0.0.0.0:8080",
-		WriteTimeout: 0, //time.Second * 15,
-		ReadTimeout:  0, //time.Second * 15,
-		IdleTimeout:  0, //time.Second * 60,
-		Handler:      r,
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Failed to load the env vars: %v", err)
 	}
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Println(err)
-		}
-	}()
-	log.Println("listening at ", srv.Addr)
 
-	c := make(chan os.Signal, 1)
+	auth, err := authenticator.New()
+	if err != nil {
+		log.Fatalf("Failed to initialize the authenticator: %v", err)
+	}
 
-	signal.Notify(c, os.Interrupt)
+	rtr := router.New(auth)
 
-	<-c
+	log.Print("Server listening on http://localhost:3000/")
+	if err := http.ListenAndServe("0.0.0.0:3000", rtr); err != nil {
+		log.Fatalf("There was an error with the http server: %v", err)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), wait)
-	defer cancel()
+	// r := mux.NewRouter()
+	// // This will serve files under http://localhost:8080/static/<filename>
+	// r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
 
-	srv.Shutdown(ctx)
+	// r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions, http.MethodGet)
+	// r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
+	// r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
+	// r.HandleFunc("/api/budget", getBudget).Methods(http.MethodGet, http.MethodOptions)
+	// r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
+	// r.HandleFunc("/api/spendings", getSpendings).Methods(http.MethodGet, http.MethodOptions)
 
-	log.Println("shutting down")
-	os.Exit(0)
+	// //a := r.PathPrefix("/{id:[0-9]+}/").Subrouter()
+
+	// // r.handleFunc("/api/webhook/
+	// //a.Use(checkUserExists)
+
+	// r.HandleFunc("/home/{id:[0-9]+}", homePage)
+	// r.HandleFunc("/accounts/{id:[0-9]+}", accounts)
+	// r.HandleFunc("/link/{id:[0-9]+}", linkBank)
+	// r.HandleFunc("/new", newUser).Methods("GET")
+	// r.HandleFunc("/new", newUserPost).Methods("POST")
+	// r.HandleFunc("/api/publicToken/{id:[0-9]+}", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
+	// r.HandleFunc("/budget/{id:[0-9]+}", budget).Methods("GET")
+	// r.HandleFunc("/budget/{id:[0-9]+}", updateBudget).Methods("POST")
+
+	// srv := &http.Server{
+	// 	Addr:         "0.0.0.0:8080",
+	// 	WriteTimeout: 0, //time.Second * 15,
+	// 	ReadTimeout:  0, //time.Second * 15,
+	// 	IdleTimeout:  0, //time.Second * 60,
+	// 	Handler:      r,
+	// }
+	// go func() {
+	// 	if err := srv.ListenAndServe(); err != nil {
+	// 		log.Println(err)
+	// 	}
+	// }()
+	// log.Println("listening at ", srv.Addr)
+
+	// c := make(chan os.Signal, 1)
+
+	// signal.Notify(c, os.Interrupt)
+
+	// <-c
+
+	// ctx, cancel := context.WithTimeout(context.Background(), wait)
+	// defer cancel()
+
+	// srv.Shutdown(ctx)
+
+	// log.Println("shutting down")
+	// os.Exit(0)
 }
 
 var (
@@ -111,16 +125,28 @@ func init() {
 	plaidClient.InitClient()
 }
 
-func CorsMiddleware(next http.Handler) http.Handler {
+func checkUserExists(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, authorization, Cookie")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		vars := mux.Vars(r)
+		userIdStr := vars["id"]
+		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		if err != nil {
+			w.WriteHeader(404)
+			return
+		}
+		if !db.CheckUserExists(userId) {
+			fmt.Println("redirecting")
+			http.Redirect(w, r, "/new", http.StatusTemporaryRedirect)
+			//http.ServeFile(w, r, "static/signup.html")
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
 
 func newUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL)
+	log.Println("hit this")
 	http.ServeFile(w, r, "static/signup.html")
 }
 
@@ -140,9 +166,12 @@ func newUserPost(w http.ResponseWriter, r *http.Request) {
 	idCookie := fmt.Sprintf("userId=%d", userId)
 	w.Header().Set("Set-Cookie", idCookie)
 	w.WriteHeader(http.StatusOK)
+	newUrl := fmt.Sprintf("/%v/home", userId)
+	http.Redirect(w, r, newUrl, http.StatusTemporaryRedirect)
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("hit homepage")
 	vars := mux.Vars(r)
 	userIdStr := vars["id"]
 	userId, err := strconv.ParseInt(userIdStr, 10, 64)
@@ -177,17 +206,16 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	sortDirStr := query.Get("sortDir")
 
 	//fmt.Fprintf(w, "UserId: %v\n", vars["userId"])
-	accounts, err := getAllAccounts(userId)
-	fmt.Println("Accounts: ", accounts)
+	//accounts, err := getAllAccounts(userId)
 
 	transactionsLimit := 0
 	if !allTransactions {
 		transactionsLimit = 10
 	}
-	transactions, err, updateTokens := getTransactions(userId, transactionsLimit)
+	transactions, updateTokens, err := getTransactions(userId, transactionsLimit)
 	if len(updateTokens) > 0 {
 		// send to route that builds and sends linkUpdate HTML
-		updateItems(w, r, updateTokens)
+		updateItems(w, updateTokens)
 		return
 	}
 	if err != nil {
@@ -251,7 +279,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func updateItems(w http.ResponseWriter, r *http.Request, updateTokens []string) {
+func updateItems(w http.ResponseWriter, updateTokens []string) {
 	template, err := template.ParseFiles("templates/updateLink.tmpl")
 	if err != nil {
 		panic(err)
@@ -314,7 +342,6 @@ func accounts(w http.ResponseWriter, r *http.Request) {
 		allAccounts = append(allAccounts, accounts...)
 	}
 
-	fmt.Println(len(allAccounts))
 	templates := template.Must(template.ParseFiles("templates/navbar.tmpl"))
 	_, err = templates.ParseFiles("templates/accounts.tmpl")
 	if err != nil {
@@ -344,19 +371,20 @@ func budget(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		return
 	}
-	budget, err := db.GetBudget(int(userId))
-	if err != nil {
-		panic(err)
-	}
+	budget, _ := db.GetBudget(int(userId))
 
-	templates, err := template.ParseFiles("templates/budget.tmpl")
+	templates, err := template.ParseFiles("templates/budget.tmpl", "templates/navbar.tmpl")
 	if err != nil {
 		panic(err)
 	}
 
 	err = templates.ExecuteTemplate(w, "Budget", struct {
+		Page          string
+		UserId        int64
 		CurrentBudget float32
 	}{
+		Page:          "budget",
+		UserId:        userId,
 		CurrentBudget: budget,
 	})
 
@@ -382,14 +410,13 @@ func updateBudget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db.InsertBudget(int(userId), float32(amount))
-	w.Write([]byte(fmt.Sprintf("budget updated to %v", amount)))
+	//w.Write([]byte(fmt.Sprintf("budget updated to %v", amount)))
 }
 
 func signin(w http.ResponseWriter, r *http.Request) {
 	//if r.Method == http.MethodOptions {
 	//	return
 	//}
-	fmt.Println("yo")
 	auth := r.Header.Get("Authorization")
 	usernameAndPass, err := b64.StdEncoding.DecodeString(auth)
 	if err != nil {
@@ -459,7 +486,6 @@ func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 	//TODO: make sure token exists
-	fmt.Println(t)
 	publicToken := t.Public_token
 	fmt.Printf("publicToken: %s", publicToken)
 	accessToken, itemId := plaidClient.ExchangePublicToken(publicToken)
@@ -511,8 +537,7 @@ func getAllAccounts(userId int64) ([]types.Account, error) {
 	return allAccounts, nil
 }
 
-func getTransactions(userId int64, limit int) ([]types.Transaction, error, []string) {
-	fmt.Println(userId)
+func getTransactions(userId int64, limit int) ([]types.Transaction, []string, error) {
 	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
 		log.Fatal(err)
@@ -530,27 +555,23 @@ func getTransactions(userId int64, limit int) ([]types.Transaction, error, []str
 			updateTokens = append(updateTokens, updateToken)
 		}
 		if err != nil {
-			// do
-			return nil, err, nil
+			return nil, nil, err
 		}
+
 		if len(add) > 0 || len(mod) > 0 || len(rem) > 0 {
 			err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
-		} else {
-			fmt.Println("no transactions returned.")
 		}
 		if err != nil {
-			return nil, err, nil
+			return nil, nil, err
 		}
 
 		added = append(added, add...)
 		modified = append(modified, mod...)
 		removed = append(removed, rem...)
-		fmt.Println("transactions: ", added, modified, removed)
-		fmt.Println("newcursor: ", newcursor)
 	}
 
 	if len(updateTokens) > 0 {
-		return nil, nil, updateTokens
+		return nil, updateTokens, nil
 	}
 
 	transactions, err := db.GetTransactionsForUser(int(userId), limit, 0)
@@ -558,7 +579,7 @@ func getTransactions(userId int64, limit int) ([]types.Transaction, error, []str
 		panic(err)
 	}
 
-	return transactions, err, nil
+	return transactions, nil, nil
 }
 
 func getBalance(w http.ResponseWriter, r *http.Request) {

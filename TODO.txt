@@ -1,19 +1,14 @@
 TODO:
 
-transition to server-side rendering:
-- auth:
-    - move authentication into middleware
-    - better auth / secure storage of access key 
+[ ] webhooks for auto updating transaction history
+    [ ] never call getTransactions directly from user. webhook will fire when update is needed
 
-- refactor get/save account code
-- create component(s) for displaying accounts + balances
-- create component(s) for budget display
+[ ] auth:
+    [ ] move authentication into middleware
+    [ ] better auth / secure storage of access key 
+
 - redo getting transactions
 - adding filter option to transaction list
 - sessions (https://pkg.go.dev/github.com/gorilla/sessions#section-readme)
-- webhooks for auto updating transaction history?
 - prevent duplicate items (https://plaid.com/docs/link/duplicate-items)
 - filter by primary categories?
-
-completed: 
-- update personal finance categories to use detailed as PK
