@@ -43,7 +43,7 @@ func main() {
 		log.Fatalf("Failed to initialize the authenticator: %v", err)
 	}
 
-	rtr := router.New(auth)
+	rtr := router.New(auth, db)
 
 	log.Print("Server listening on http://localhost:3000/")
 	if err := http.ListenAndServe("0.0.0.0:3000", rtr); err != nil {
@@ -151,23 +151,23 @@ func newUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func newUserPost(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	r.Form.Get("nonexistent")
-	username := r.Form.Get("username")
-	pass := r.Form.Get("pass")
-	//TODO: validate username and pass
-	//TODO: hash password?
-	userId, err := db.CreateUser(username, pass)
+	// r.ParseForm()
+	// r.Form.Get("nonexistent")
+	// username := r.Form.Get("username")
+	// pass := r.Form.Get("pass")
+	// //TODO: validate username and pass
+	// //TODO: hash password?
+	// userId, err := db.CreateUser(email)
 
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	// if err != nil {
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// }
 
-	idCookie := fmt.Sprintf("userId=%d", userId)
-	w.Header().Set("Set-Cookie", idCookie)
-	w.WriteHeader(http.StatusOK)
-	newUrl := fmt.Sprintf("/%v/home", userId)
-	http.Redirect(w, r, newUrl, http.StatusTemporaryRedirect)
+	// idCookie := fmt.Sprintf("userId=%d", userId)
+	// w.Header().Set("Set-Cookie", idCookie)
+	// w.WriteHeader(http.StatusOK)
+	// newUrl := fmt.Sprintf("/%v/home", userId)
+	// http.Redirect(w, r, newUrl, http.StatusTemporaryRedirect)
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {

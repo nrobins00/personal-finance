@@ -8,11 +8,12 @@ import (
 
 	"github.com/gorilla/sessions"
 
+	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/platform/authenticator"
 )
 
 // Handler for our callback.
-func Handler(auth *authenticator.Authenticator) http.HandlerFunc {
+func Handler(auth *authenticator.Authenticator, db *database.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := r.Context().Value("session").(*sessions.Session)
 
@@ -45,6 +46,19 @@ func Handler(auth *authenticator.Authenticator) http.HandlerFunc {
 			return
 		}
 
+		userInfo, err := auth.GetUserInfo(r.Context(), token)
+		if err != nil {
+			fmt.Fprint(w, err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		userId, err := db.GetUserIdByEmail(userInfo.Email)
+		if err != nil {
+			db.CreateUser(userInfo.Email)
+		}
+
+		session.Values["userId"] = userId
 		session.Values["access_token"] = token.AccessToken
 		session.Values["profile"] = profile
 
@@ -55,6 +69,6 @@ func Handler(auth *authenticator.Authenticator) http.HandlerFunc {
 		}
 
 		// Redirect to logged in page.
-		http.Redirect(w, r, "/user", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/auth/user", http.StatusTemporaryRedirect)
 	}
 }

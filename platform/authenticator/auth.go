@@ -32,7 +32,7 @@ func New() (*Authenticator, error) {
 		ClientSecret: os.Getenv("AUTH0_CLIENT_SECRET"),
 		RedirectURL:  os.Getenv("AUTH0_CALLBACK_URL"),
 		Endpoint:     provider.Endpoint(),
-		Scopes:       []string{oidc.ScopeOpenID, "profile"},
+		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 	}
 
 	return &Authenticator{
@@ -53,4 +53,13 @@ func (a *Authenticator) VerifyIDToken(ctx context.Context, token *oauth2.Token) 
 	}
 
 	return a.Verifier(oidcConfig).Verify(ctx, rawIDToken)
+}
+
+func (a *Authenticator) GetUserInfo(ctx context.Context, token *oauth2.Token) (*oidc.UserInfo, error) {
+	tokenSource := a.Config.TokenSource(ctx, token)
+	userInfo, err := a.Provider.UserInfo(ctx, tokenSource)
+	if err != nil {
+		return nil, err
+	}
+	return userInfo, nil
 }

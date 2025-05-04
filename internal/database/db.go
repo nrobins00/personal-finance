@@ -14,12 +14,12 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) CreateUser(username string, password string) (int64, error) {
+func (db *DB) CreateUser(email string) (int64, error) {
 	const createUser = `
-		INSERT INTO user (username, password)
-		VALUES (?, ?)
+		INSERT INTO user (email)
+		VALUES (?)
 	`
-	result, err := db.Exec(createUser, username, password)
+	result, err := db.Exec(createUser, email)
 	if err != nil {
 		return -1, err
 	}
@@ -53,6 +53,19 @@ func (db *DB) CheckUserExists(userId int64) bool {
 	err := row.Scan()
 	fmt.Println(err)
 	return err == nil
+}
+
+func (db *DB) GetUserIdByEmail(email string) (int64, error) {
+	const query string = `
+		SELECT userId
+		FROM user
+		WHERE email = ?
+	`
+
+	row := db.QueryRow(query, email)
+	var userId int64
+	err := row.Scan(&userId)
+	return userId, err
 }
 
 func (db *DB) UpdateTransactions(itemId string, added, modified, removed []types.Transaction, cursor string) error {

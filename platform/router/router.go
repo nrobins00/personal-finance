@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 
+	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/web/app/login"
 	"github.com/nrobins00/personal-finance/web/app/logout"
 	"github.com/nrobins00/personal-finance/web/templates"
@@ -34,7 +35,7 @@ func getSessionMiddleware(store *sessions.CookieStore) mux.MiddlewareFunc {
 func isAuthenticatedMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session := r.Context().Value("session").(*sessions.Session)
-		if session.Values["Profile"] == nil {
+		if session.Values["profile"] == nil {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 		} else {
 			next.ServeHTTP(w, r)
@@ -42,8 +43,16 @@ func isAuthenticatedMiddleWare(next http.Handler) http.Handler {
 	})
 }
 
+func writeUserIdMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session := r.Context().Value("session").(*sessions.Session)
+		fmt.Println(session.Values["userId"])
+		next.ServeHTTP(w, r)
+	})
+}
+
 // New registers the routes and returns the router.
-func New(auth *authenticator.Authenticator) *mux.Router {
+func New(auth *authenticator.Authenticator, db *database.DB) *mux.Router {
 	router := mux.NewRouter()
 
 	// To store custom types in our cookies,
@@ -53,6 +62,7 @@ func New(auth *authenticator.Authenticator) *mux.Router {
 	store := sessions.NewCookieStore([]byte("secret")) // TODO: use actual secret
 
 	router.Use(getSessionMiddleware(store))
+	router.Use(writeUserIdMiddleware)
 	authR := router.PathPrefix("/auth/").Subrouter()
 	authR.Use(isAuthenticatedMiddleWare)
 
@@ -65,7 +75,7 @@ func New(auth *authenticator.Authenticator) *mux.Router {
 		templates.Home(w)
 	})
 	router.HandleFunc("/login", login.Handler(auth)).Methods("GET")
-	router.HandleFunc("/callback", callback.Handler(auth)).Methods("GET")
+	router.HandleFunc("/callback", callback.Handler(auth, db)).Methods("GET")
 	router.HandleFunc("/logout", logout.Handler).Methods("GET")
 	authR.HandleFunc("/user", user.Handler).Methods("GET")
 

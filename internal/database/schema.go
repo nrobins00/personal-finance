@@ -28,8 +28,7 @@ func CreateDatabase(filename string) *DB {
 	const createUserTable string = `
 		CREATE TABLE IF NOT EXISTS user (
 			userId INTEGER NOT NULL PRIMARY KEY,
-			username TEXT NOT NULL UNIQUE,
-			password TEXT NOT NULL
+			email TEXT NOT NULL UNIQUE
         );
     `
 
