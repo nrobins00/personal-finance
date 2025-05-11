@@ -2,13 +2,21 @@ TODO:
 
 [ ] webhooks for auto updating transaction history
     [ ] never call getTransactions directly from user. webhook will fire when update is needed
+    [ ] ngrok for port forwarding to listen to webhooks
+
+[ ] database updates
+    [ ] maybe can use some kind of special handling that sets a transaction's accountKey only if the account exists
+[ ] webhooks for account updates
+    [ ] use Link's update mode to request access from user
+[ ] prevent duplicate items (https://plaid.com/docs/link/duplicate-items)
+[ ] consider using go templates to build sql queries
 
 [ ] auth:
+    [ ] handle token expiration
     [ ] move authentication into middleware
     [ ] better auth / secure storage of access key 
 
 - redo getting transactions
 - adding filter option to transaction list
 - sessions (https://pkg.go.dev/github.com/gorilla/sessions#section-readme)
-- prevent duplicate items (https://plaid.com/docs/link/duplicate-items)
 - filter by primary categories?

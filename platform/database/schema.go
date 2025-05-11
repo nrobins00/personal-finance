@@ -79,7 +79,8 @@ func CreateDatabase(filename string) *DB {
 			type TEXT,
 			lastUpdatedDttm TEXT,
 			FOREIGN KEY(userId) REFERENCES user(userId),
-			FOREIGN KEY(itemKey) REFERENCES item(itemKey)
+			FOREIGN KEY(itemKey) REFERENCES item(itemKey),
+			UNIQUE(accountId)
 		);
 	`
 	if _, err := db.Exec(createAccountTable); err != nil {

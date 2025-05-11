@@ -1,5 +1,6 @@
 let plaidLinkHandler;
-const linkTokenResp = fetch("http://localhost:8080/api/linktoken", {
+const hostname = window.location.host;
+const linkTokenResp = fetch("http://" + hostname + "/api/linktoken", {
   method: "POST",
 })
   .then((resp) => resp.json())
@@ -18,21 +19,18 @@ const linkTokenResp = fetch("http://localhost:8080/api/linktoken", {
   });
 
 async function exchangePublicToken(public_token, metadata) {
-  const startOfUserId = window.location.pathname.lastIndexOf("/") + 1;
-  const userId = window.location.pathname.substring(startOfUserId);
-  const hostname = window.location.host;
-  const url = "http://" + hostname + "/api/publicToken/" + userId;
+  const url = "http://" + hostname + "/api/publicToken";
   const response = await fetch(url, {
     // TODO: figure out how to handle IP
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      //UserId: userId,
     },
     body: JSON.stringify({ Public_token: public_token }),
   });
   const data = await response.json();
   console.log(data.access_token);
+  //window.location.replace("http://" + hostname + "/home")
 }
 
 function linkClickHandler() {

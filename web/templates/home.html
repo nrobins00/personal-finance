@@ -1,8 +1,9 @@
-<!-- web/template/home.html -->
 {{define "content"}}
-<div>
-    <h3>Auth0 Example</h3>
-    <p>Zero friction identity infrastructure, built for developers</p>
-    <a href="/login">SignIn</a>
-</div>
+	<p>budget: {{.Budget}}</p>
+	<p>spent: {{.Spent}}</p>
+	<hr>
+	{{template "Transactions" .}}
+	{{if .MoreTransactions}}
+	<a href="/home/{{.UserId}}?allTransactions=true">See all transactions</a>
+	{{end}}
 {{end}}

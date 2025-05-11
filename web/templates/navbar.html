@@ -1,0 +1,20 @@
+{{define "Navbar"}}
+<div class="topnav">
+  {{if (eq .Page "home")}} 
+  <a class="active" href="/home">Home</a>
+  {{else}}
+  <a href="/home">Home</a>
+  {{end}}
+  {{if (eq .Page "accounts")}} 
+  <a class="active" href="/accounts">Accounts</a>
+  {{else}}
+  <a href="/accounts">Accounts</a>
+  {{end}}
+  {{if (eq .Page "budget")}} 
+  <a class="active" href="/budget">Budget</a>
+  {{else}}
+  <a href="/budget">Budget</a>
+  {{end}}
+  <a href="/link">Link New Account</a>
+</div> 
+{{end}}

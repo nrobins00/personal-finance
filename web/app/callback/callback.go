@@ -8,8 +8,8 @@ import (
 
 	"github.com/gorilla/sessions"
 
-	"github.com/nrobins00/personal-finance/internal/database"
 	"github.com/nrobins00/personal-finance/platform/authenticator"
+	"github.com/nrobins00/personal-finance/platform/database"
 )
 
 // Handler for our callback.
@@ -55,7 +55,12 @@ func Handler(auth *authenticator.Authenticator, db *database.DB) http.HandlerFun
 
 		userId, err := db.GetUserIdByEmail(userInfo.Email)
 		if err != nil {
-			db.CreateUser(userInfo.Email)
+			// no user found, so create one
+			userId, err = db.CreateUser(userInfo.Email)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "Error: %v", err)
+			}
 		}
 
 		session.Values["userId"] = userId

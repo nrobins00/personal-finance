@@ -1,37 +1,37 @@
-package main
+package customSort
 
 import (
 	"sort"
 	"time"
 
-	"github.com/nrobins00/personal-finance/internal/types"
+	"github.com/nrobins00/personal-finance/types"
 )
 
 type By func(t1, t2 *types.Transaction) bool
 
 func (by By) Sort(transactions []types.Transaction) {
 	ts := &TransactionSorter{
-		transactions: transactions,
-		by:           by,
+		Transactions: transactions,
+		By:           by,
 	}
 	sort.Sort(ts)
 }
 
 func (ts *TransactionSorter) Len() int {
-	return len(ts.transactions)
+	return len(ts.Transactions)
 }
 
 func (ts *TransactionSorter) Less(i, j int) bool {
-	return ts.by(&ts.transactions[i], &ts.transactions[j])
+	return ts.By(&ts.Transactions[i], &ts.Transactions[j])
 }
 
 func (ts *TransactionSorter) Swap(i, j int) {
-	ts.transactions[i], ts.transactions[j] = ts.transactions[j], ts.transactions[i]
+	ts.Transactions[i], ts.Transactions[j] = ts.Transactions[j], ts.Transactions[i]
 }
 
 type TransactionSorter struct {
-	transactions []types.Transaction
-	by           func(t1, t2 *types.Transaction) bool
+	Transactions []types.Transaction
+	By           func(t1, t2 *types.Transaction) bool
 }
 
 func Amount(t1, t2 *types.Transaction) bool {

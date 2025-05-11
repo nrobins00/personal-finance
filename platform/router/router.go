@@ -11,9 +11,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 
-	"github.com/nrobins00/personal-finance/internal/database"
+	"github.com/nrobins00/personal-finance/platform/database"
+	"github.com/nrobins00/personal-finance/platform/plaidActions"
+	"github.com/nrobins00/personal-finance/web/app/home"
+	"github.com/nrobins00/personal-finance/web/app/link"
 	"github.com/nrobins00/personal-finance/web/app/login"
 	"github.com/nrobins00/personal-finance/web/app/logout"
+	"github.com/nrobins00/personal-finance/web/app/webhooks"
 	"github.com/nrobins00/personal-finance/web/templates"
 
 	"github.com/nrobins00/personal-finance/platform/authenticator"
@@ -46,13 +50,13 @@ func isAuthenticatedMiddleWare(next http.Handler) http.Handler {
 func writeUserIdMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session := r.Context().Value("session").(*sessions.Session)
-		fmt.Println(session.Values["userId"])
+		fmt.Printf("userId: %v\n", session.Values["userId"])
 		next.ServeHTTP(w, r)
 	})
 }
 
 // New registers the routes and returns the router.
-func New(auth *authenticator.Authenticator, db *database.DB) *mux.Router {
+func New(auth *authenticator.Authenticator, db *database.DB, plaidClient plaidActions.PlaidClient) *mux.Router {
 	router := mux.NewRouter()
 
 	// To store custom types in our cookies,
@@ -72,12 +76,19 @@ func New(auth *authenticator.Authenticator, db *database.DB) *mux.Router {
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("hit home")
-		templates.Home(w)
+		templates.Login(w)
 	})
 	router.HandleFunc("/login", login.Handler(auth)).Methods("GET")
 	router.HandleFunc("/callback", callback.Handler(auth, db)).Methods("GET")
 	router.HandleFunc("/logout", logout.Handler).Methods("GET")
 	authR.HandleFunc("/user", user.Handler).Methods("GET")
+	router.HandleFunc("/home", home.HomePage(db, plaidClient))
+	router.HandleFunc("/link", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/static/html/link.html")
+	})
 
+	router.HandleFunc("/api/publicToken", link.ExchangePublicToken(db, plaidClient)).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc("/api/linktoken", link.CreateLinkToken(plaidClient)).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc("/webhooks", webhooks.WebhookHandler(db, plaidClient))
 	return router
 }

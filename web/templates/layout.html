@@ -1,14 +1,24 @@
 <!-- layout.html -->
 <html>
     <head>
+        <meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title></title>
+        
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+        <link rel="stylesheet" href="/public/css/navbar.css">
+		<link rel="stylesheet" href="/public/css/transactions.css"></link>
+		<script src="/public/js/transactions.js" ></script>
+		<script src="https://kit.fontawesome.com/ac7bc0ef40.js" crossorigin="anonymous"></script>
     </head>
     <body>
-        <div class="navbar">...</div>
+        <!-- div class="navbar">...</div -->
+        {{block "Navbar" .}}
+        {{end}}
         <div class="content">
-            {{block "content" .}}
+            {{template "content" .}}
                 <!-- Fallback, if "content" is not defined elsewhere -->
-            {{end}}
             <script src="/public/js/user.js"></script>
         </div>
     </body>

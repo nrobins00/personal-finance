@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/nrobins00/personal-finance/internal/types"
+	"github.com/nrobins00/personal-finance/types"
 )
 
 type DB struct {
@@ -226,13 +226,13 @@ func (db *DB) GetLatestCursor(itemId string) (string, error) {
 
 func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account) error {
 	if len(accounts) == 0 {
-		return fmt.Errorf("No accounts passed")
+		return fmt.Errorf("no accounts passed")
 	}
 	query := `
 		INSERT INTO account (
 			accountId, 
 			userId, 
-			itemKey, 
+			itemKey,
 			mask,
 			name,
 			availableBalance, 
@@ -250,6 +250,7 @@ func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account
 			query += ", "
 		}
 	}
+	query += " ON CONFLICT (accountId) DO NOTHING"
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -284,6 +285,24 @@ func (db *DB) InsertAccounts(userId int64, itemKey int, accounts []types.Account
 	}
 	rows.Close()
 */
+
+func (db *DB) GetAllAccountsForUser(userId int64) ([]types.Account, error) {
+	items, err := db.GetAllItemsForUser(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var accounts []types.Account
+	for _, item := range items {
+		itemAccounts, err := db.GetAllAccounts(item.ItemKey)
+		if err != nil {
+			continue
+		}
+		accounts = append(accounts, itemAccounts...)
+	}
+
+	return accounts, nil
+}
 
 func (db *DB) GetAllAccounts(itemKey int) ([]types.Account, error) {
 	const accQuery string = `
@@ -346,6 +365,30 @@ func (db DB) GetAllItemsForUser(userId int64) ([]types.Item, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func (db DB) GetItem(itemId string) (types.Item, error) {
+	const query string = `
+		SELECT itemKey, userId, accessKey, cursor FROM item where itemId = ?
+	`
+
+	var item types.Item
+	var itemKey int
+	var userId int64
+	var accessToken string
+	var cursor sql.NullString
+	err := db.QueryRow(query, itemId).Scan(&itemKey, &userId, &accessToken, &cursor)
+	if err != nil {
+		return item, err
+	}
+	item.ItemKey = itemKey
+	item.ItemId = itemId
+	item.UserId = userId
+	item.AccessToken = accessToken
+	if cursor.Valid {
+		item.Cursor = cursor.String
+	}
+	return item, nil
 }
 
 func (db DB) buildAccountKeyMap(transactions []types.Transaction) (map[string]int, error) {
@@ -433,6 +476,7 @@ func (db DB) GetSpendingsForLastMonth(userId int) (float32, error) {
 		JOIN item on item.itemKey = account.itemKey
 		WHERE item.userId = ?
 		AND transax.authorizedDttm > DATE('now', '-1 month')
+		AND transax.amount > 0
 	`
 
 	row := db.QueryRow(transQuery, userId)

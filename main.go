@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"net/http"
 	"os"
 
-	"sort"
 	"strconv"
 
 	"strings"
@@ -18,11 +16,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/nrobins00/personal-finance/internal/database"
-	"github.com/nrobins00/personal-finance/internal/plaidActions"
-	"github.com/nrobins00/personal-finance/internal/types"
 	"github.com/nrobins00/personal-finance/platform/authenticator"
+	"github.com/nrobins00/personal-finance/platform/database"
+	"github.com/nrobins00/personal-finance/platform/plaidActions"
 	"github.com/nrobins00/personal-finance/platform/router"
+	"github.com/nrobins00/personal-finance/types"
 )
 
 func main() {
@@ -43,7 +41,7 @@ func main() {
 		log.Fatalf("Failed to initialize the authenticator: %v", err)
 	}
 
-	rtr := router.New(auth, db)
+	rtr := router.New(auth, db, plaidClient)
 
 	log.Print("Server listening on http://localhost:3000/")
 	if err := http.ListenAndServe("0.0.0.0:3000", rtr); err != nil {
@@ -168,144 +166,6 @@ func newUserPost(w http.ResponseWriter, r *http.Request) {
 	// w.WriteHeader(http.StatusOK)
 	// newUrl := fmt.Sprintf("/%v/home", userId)
 	// http.Redirect(w, r, newUrl, http.StatusTemporaryRedirect)
-}
-
-func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("hit homepage")
-	vars := mux.Vars(r)
-	userIdStr := vars["id"]
-	userId, err := strconv.ParseInt(userIdStr, 10, 64)
-	if err != nil {
-		//TODO: redirect to new user or sign in page
-		w.WriteHeader(404)
-		return
-	}
-	query := r.URL.Query()
-
-	allTransactionsStr := query.Get("allTransactions")
-	allTransactions := false
-	if allTransactionsStr == "true" {
-		allTransactions = true
-	}
-
-	sortColStr := query.Get("sortCol")
-	var sortCol By
-	switch sortColStr {
-	case "Amount":
-		sortCol = Amount
-	case "Date":
-		sortCol = Date
-	case "Category":
-		sortCol = Category
-	case "AccountName":
-		sortCol = AccountName
-	default:
-		sortCol = nil
-	}
-
-	sortDirStr := query.Get("sortDir")
-
-	//fmt.Fprintf(w, "UserId: %v\n", vars["userId"])
-	//accounts, err := getAllAccounts(userId)
-
-	transactionsLimit := 0
-	if !allTransactions {
-		transactionsLimit = 10
-	}
-	transactions, updateTokens, err := getTransactions(userId, transactionsLimit)
-	if len(updateTokens) > 0 {
-		// send to route that builds and sends linkUpdate HTML
-		updateItems(w, updateTokens)
-		return
-	}
-	if err != nil {
-		// update link
-		//panic(err)
-		fmt.Println(err)
-	}
-
-	if sortCol != nil {
-		transSorter := &TransactionSorter{
-			transactions: transactions,
-			by:           sortCol,
-		}
-		if sortDirStr == "desc" {
-			sort.Sort(sort.Reverse(transSorter))
-		} else {
-			sort.Sort(transSorter)
-		}
-	}
-
-	spendings, err := db.GetSpendingsForLastMonth(int(userId))
-	if err != nil {
-		//panic(err)
-		fmt.Println(err)
-	}
-
-	budget, err := db.GetBudget(int(userId))
-	if err != nil && err != sql.ErrNoRows {
-		fmt.Println(err)
-	}
-	templates := template.Must(template.ParseFiles("templates/navbar.tmpl", "templates/transactions.tmpl"))
-	_, err = templates.ParseFiles("templates/home.tmpl")
-	if err != nil {
-		panic(err)
-	}
-	w.WriteHeader(200)
-
-	err = templates.ExecuteTemplate(w, "Home", struct {
-		Spent            float32
-		Budget           float32
-		Transactions     []types.Transaction
-		UserId           int64
-		Page             string
-		MoreTransactions bool
-		Categories       []string
-		SortCol          string
-		SortDir          string
-	}{
-		Spent:            spendings,
-		Budget:           budget,
-		Transactions:     transactions,
-		UserId:           userId,
-		Page:             "home",
-		MoreTransactions: !allTransactions,
-		Categories:       getAllCategoriesFromTransactions(transactions),
-		SortCol:          sortColStr,
-		SortDir:          sortDirStr,
-	})
-	if err != nil {
-		panic(err)
-	}
-}
-
-func updateItems(w http.ResponseWriter, updateTokens []string) {
-	template, err := template.ParseFiles("templates/updateLink.tmpl")
-	if err != nil {
-		panic(err)
-	}
-	err = template.ExecuteTemplate(w, "UpdateLink", struct {
-		UpdateTokens []string
-	}{
-		UpdateTokens: updateTokens,
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func getAllCategoriesFromTransactions(transactions []types.Transaction) []string {
-	catSet := make(map[string]bool)
-	for _, trans := range transactions {
-		catSet[trans.CategoryDetailed] = true
-	}
-
-	catSlice := make([]string, 0, len(catSet))
-	for cat := range catSet {
-		catSlice = append(catSlice, cat)
-	}
-	return catSlice
 }
 
 func accounts(w http.ResponseWriter, r *http.Request) {
@@ -441,71 +301,6 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func linkBank(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("static/link.html")
-	if err != nil {
-		panic(err)
-	}
-	err = tmpl.Execute(w, nil)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func createLinkToken(w http.ResponseWriter, r *http.Request) {
-	linkToken := plaidClient.GetLinkToken()
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	resp := map[string]string{"link_token": linkToken}
-	json, err := json.Marshal(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Write(json)
-}
-
-func exchangePublicToken(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		return
-	}
-	vars := mux.Vars(r)
-	userIdStr := vars["id"]
-	userId, err := strconv.ParseInt(userIdStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(404)
-		return
-	}
-
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields() //why??
-	t := struct {
-		Public_token string
-	}{}
-	err = d.Decode(&t)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-	//TODO: make sure token exists
-	publicToken := t.Public_token
-	fmt.Printf("publicToken: %s", publicToken)
-	accessToken, itemId := plaidClient.ExchangePublicToken(publicToken)
-	fmt.Printf("userId: %d\nitemId: %s", userId, itemId)
-
-	newId, err := db.CreateItem(userId, itemId, accessToken)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Print(newId)
-
-	resp := map[string]string{"access_token": accessToken}
-	json, err := json.Marshal(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	w.Write(json)
-}
-
 func getAllAccounts(userId int64) ([]types.Account, error) {
 	items, err := db.GetAllItemsForUser(userId)
 	if err != nil {
@@ -535,51 +330,6 @@ func getAllAccounts(userId int64) ([]types.Account, error) {
 		allAccounts = append(allAccounts, accounts...)
 	}
 	return allAccounts, nil
-}
-
-func getTransactions(userId int64, limit int) ([]types.Transaction, []string, error) {
-	items, err := db.GetAllItemsForUser(userId)
-	if err != nil {
-		log.Fatal(err)
-	}
-	added := make([]types.Transaction, 0)
-	modified := make([]types.Transaction, 0)
-	removed := make([]types.Transaction, 0)
-
-	updateTokens := make([]string, 0)
-
-	//TODO: replace this with webhooks
-	for _, item := range items {
-		add, mod, rem, newcursor, err, updateToken := plaidClient.GetTransactions(item.AccessToken, item.Cursor)
-		if updateToken != "" {
-			updateTokens = append(updateTokens, updateToken)
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if len(add) > 0 || len(mod) > 0 || len(rem) > 0 {
-			err = db.UpdateTransactions(item.ItemId, add, mod, rem, newcursor)
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-
-		added = append(added, add...)
-		modified = append(modified, mod...)
-		removed = append(removed, rem...)
-	}
-
-	if len(updateTokens) > 0 {
-		return nil, updateTokens, nil
-	}
-
-	transactions, err := db.GetTransactionsForUser(int(userId), limit, 0)
-	if err != nil {
-		panic(err)
-	}
-
-	return transactions, nil, nil
 }
 
 func getBalance(w http.ResponseWriter, r *http.Request) {

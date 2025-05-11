@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/nrobins00/personal-finance/internal/types"
+	"github.com/nrobins00/personal-finance/types"
 	"github.com/plaid/plaid-go/plaid"
 )
 
@@ -30,7 +30,8 @@ func (c *PlaidClient) GetLinkToken() string {
 		"Plaid Test", "en", []plaid.CountryCode{plaid.COUNTRYCODE_US},
 		user,
 	)
-	request.SetWebhook("https://eocttvfeaqmdhw.m.pipedream.net")
+	//request.SetWebhook("https://eocttvfeaqmdhw.m.pipedream.net")
+	request.SetWebhook("https://mighty-snail-pleasant.ngrok-free.app/webhooks")
 	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH, plaid.PRODUCTS_TRANSACTIONS})
 	request.SetLinkCustomizationName("default")
 	resp, httpResp, err := c.client.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()
@@ -71,9 +72,9 @@ func (c *PlaidClient) ExchangePublicToken(publicToken string) (string, string) {
 	return accessToken, itemId
 }
 
-func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) {
+func (c *PlaidClient) GetAllAccounts(accessToken string) ([]types.Account, error) {
 	ctx := context.Background()
-	accountsGetRequest := plaid.NewAccountsGetRequest(accessKey)
+	accountsGetRequest := plaid.NewAccountsGetRequest(accessToken)
 	accountsGetResp, resp, err := c.client.PlaidApi.AccountsGet(ctx).AccountsGetRequest(
 		*accountsGetRequest,
 	).Execute()
@@ -98,13 +99,25 @@ func (c *PlaidClient) GetAllAccounts(accessKey string) ([]types.Account, error) 
 	return accounts, nil
 }
 
+func (c PlaidClient) InitializeTransactions(accessToken string) {
+	ctx := context.Background()
+	request := plaid.NewTransactionsSyncRequest(accessToken)
+	_, _, err := c.client.PlaidApi.TransactionsSync(
+		ctx,
+	).TransactionsSyncRequest(*request).Execute()
+
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 	add []types.Transaction,
 	mod []types.Transaction,
 	rem []types.Transaction,
 	newCursor string,
-	err error,
 	linkToken string,
+	err error,
 ) {
 	ctx := context.Background()
 	oldCursor := cursor
@@ -129,12 +142,12 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 						// do Link update
 						linkToken, err = c.UpdateItem(accessToken)
 						// return nil error here because the linkToken signifies the error
-						return add, mod, rem, oldCursor, nil, linkToken
+						return add, mod, rem, oldCursor, linkToken, nil
 					}
 				}
 			}
 			fmt.Println(httpErr.Body)
-			return add, mod, rem, oldCursor, err, ""
+			return add, mod, rem, oldCursor, "", err
 		}
 		added = append(added, resp.GetAdded()...)
 		modified = append(modified, resp.GetModified()...)
@@ -175,5 +188,5 @@ func (c PlaidClient) GetTransactions(accessToken, cursor string) (
 		})
 	}
 
-	return add, mod, rem, cursor, nil, ""
+	return add, mod, rem, cursor, "", nil
 }

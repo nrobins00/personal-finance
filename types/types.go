@@ -22,6 +22,7 @@ type Account struct {
 
 type Item struct {
 	ItemKey     int
+	UserId      int64
 	ItemId      string
 	AccessToken string
 	Cursor      string
