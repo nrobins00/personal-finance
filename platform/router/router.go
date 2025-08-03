@@ -13,6 +13,7 @@ import (
 
 	"github.com/nrobins00/personal-finance/platform/database"
 	"github.com/nrobins00/personal-finance/platform/plaidActions"
+	"github.com/nrobins00/personal-finance/web/app/accounts"
 	"github.com/nrobins00/personal-finance/web/app/home"
 	"github.com/nrobins00/personal-finance/web/app/link"
 	"github.com/nrobins00/personal-finance/web/app/login"
@@ -75,7 +76,6 @@ func New(auth *authenticator.Authenticator, db *database.DB, plaidClient plaidAc
 	// templ.Execute()
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("hit home")
 		templates.Login(w)
 	})
 	router.HandleFunc("/login", login.Handler(auth)).Methods("GET")
@@ -83,6 +83,7 @@ func New(auth *authenticator.Authenticator, db *database.DB, plaidClient plaidAc
 	router.HandleFunc("/logout", logout.Handler).Methods("GET")
 	authR.HandleFunc("/user", user.Handler).Methods("GET")
 	router.HandleFunc("/home", home.HomePage(db, plaidClient))
+	router.HandleFunc("/accounts", accounts.AccountsHandler(db))
 	router.HandleFunc("/link", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "web/static/html/link.html")
 	})

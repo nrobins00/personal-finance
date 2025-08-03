@@ -20,7 +20,6 @@ import (
 	"github.com/nrobins00/personal-finance/platform/database"
 	"github.com/nrobins00/personal-finance/platform/plaidActions"
 	"github.com/nrobins00/personal-finance/platform/router"
-	"github.com/nrobins00/personal-finance/types"
 )
 
 func main() {
@@ -52,23 +51,11 @@ func main() {
 	// // This will serve files under http://localhost:8080/static/<filename>
 	// r.PathPrefix("/static/").Handler(http.FileServer(http.Dir(dir)))
 
-	// r.HandleFunc("/", signin).Methods(http.MethodPost, http.MethodOptions, http.MethodGet)
-	// r.HandleFunc("/signin", signin).Methods(http.MethodPost, http.MethodOptions)
-	// r.HandleFunc("/api/linktoken", createLinkToken).Methods(http.MethodPost, http.MethodOptions)
 	// r.HandleFunc("/api/budget", getBudget).Methods(http.MethodGet, http.MethodOptions)
 	// r.HandleFunc("/api/budget/set", setBudget).Methods(http.MethodPost, http.MethodOptions)
-	// r.HandleFunc("/api/spendings", getSpendings).Methods(http.MethodGet, http.MethodOptions)
 
 	// //a := r.PathPrefix("/{id:[0-9]+}/").Subrouter()
 
-	// // r.handleFunc("/api/webhook/
-	// //a.Use(checkUserExists)
-
-	// r.HandleFunc("/home/{id:[0-9]+}", homePage)
-	// r.HandleFunc("/accounts/{id:[0-9]+}", accounts)
-	// r.HandleFunc("/link/{id:[0-9]+}", linkBank)
-	// r.HandleFunc("/new", newUser).Methods("GET")
-	// r.HandleFunc("/new", newUserPost).Methods("POST")
 	// r.HandleFunc("/api/publicToken/{id:[0-9]+}", exchangePublicToken).Methods(http.MethodPost, http.MethodOptions)
 	// r.HandleFunc("/budget/{id:[0-9]+}", budget).Methods("GET")
 	// r.HandleFunc("/budget/{id:[0-9]+}", updateBudget).Methods("POST")
@@ -121,106 +108,6 @@ func init() {
 	fmt.Printf("secret: %s\n", secret)
 	plaidClient = plaidActions.PlaidClient{ClientId: clientId, Secret: secret}
 	plaidClient.InitClient()
-}
-
-func checkUserExists(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		userIdStr := vars["id"]
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
-		if err != nil {
-			w.WriteHeader(404)
-			return
-		}
-		if !db.CheckUserExists(userId) {
-			fmt.Println("redirecting")
-			http.Redirect(w, r, "/new", http.StatusTemporaryRedirect)
-			//http.ServeFile(w, r, "static/signup.html")
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func newUser(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
-	log.Println("hit this")
-	http.ServeFile(w, r, "static/signup.html")
-}
-
-func newUserPost(w http.ResponseWriter, r *http.Request) {
-	// r.ParseForm()
-	// r.Form.Get("nonexistent")
-	// username := r.Form.Get("username")
-	// pass := r.Form.Get("pass")
-	// //TODO: validate username and pass
-	// //TODO: hash password?
-	// userId, err := db.CreateUser(email)
-
-	// if err != nil {
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// }
-
-	// idCookie := fmt.Sprintf("userId=%d", userId)
-	// w.Header().Set("Set-Cookie", idCookie)
-	// w.WriteHeader(http.StatusOK)
-	// newUrl := fmt.Sprintf("/%v/home", userId)
-	// http.Redirect(w, r, newUrl, http.StatusTemporaryRedirect)
-}
-
-func accounts(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userIdStr := vars["id"]
-	userId, err := strconv.ParseInt(userIdStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(404)
-		return
-	}
-
-	items, err := db.GetAllItemsForUser(userId)
-	if err != nil {
-		log.Fatal("error geting items: ", err)
-	}
-	allAccounts := make([]types.Account, 0)
-	for _, key := range items {
-		//try to get accounts from db
-		//if they don't exist (i.e. this is the first time), grab them from Plaid
-		accounts, err := db.GetAllAccounts(key.ItemKey)
-		if err != nil {
-			msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
-			log.Fatal(msg, err)
-		}
-		if len(accounts) == 0 {
-			//get accounts from Plaid
-			accounts, err = plaidClient.GetAllAccounts(key.AccessToken)
-			if err != nil {
-				msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
-				log.Fatal(msg, err)
-			}
-			db.InsertAccounts(userId, key.ItemKey, accounts)
-		}
-		allAccounts = append(allAccounts, accounts...)
-	}
-
-	templates := template.Must(template.ParseFiles("templates/navbar.tmpl"))
-	_, err = templates.ParseFiles("templates/accounts.tmpl")
-	if err != nil {
-		panic(err)
-	}
-	w.WriteHeader(200)
-	err = templates.ExecuteTemplate(w, "Accounts", struct {
-		UserId   int
-		Accounts []types.Account
-		Page     string
-	}{
-		UserId:   int(userId),
-		Accounts: allAccounts,
-		Page:     "accounts",
-	})
-
-	if err != nil {
-		panic(err)
-	}
 }
 
 func budget(w http.ResponseWriter, r *http.Request) {
@@ -301,41 +188,6 @@ func signin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func getAllAccounts(userId int64) ([]types.Account, error) {
-	items, err := db.GetAllItemsForUser(userId)
-	if err != nil {
-		log.Fatal("error geting items: ", err)
-	}
-
-	allAccounts := make([]types.Account, 0)
-	for _, key := range items {
-		//try to get accounts from db
-		//if they don't exist (i.e. this is the first time), grab them from Plaid
-		//TODO: you can link accounts after the initial one, so we need to always check plaid?
-		accounts, err := db.GetAllAccounts(key.ItemKey)
-		if err != nil {
-			msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
-			log.Fatal(msg, err)
-		}
-		if len(accounts) == 0 {
-			//get accounts from Plaid
-			accounts, err = plaidClient.GetAllAccounts(key.AccessToken)
-			if err != nil {
-				msg := fmt.Sprintf("error getting accounts for item: %v", key.ItemId)
-				log.Fatal(msg, err)
-				return nil, err
-			}
-			db.InsertAccounts(userId, key.ItemKey, accounts)
-		}
-		allAccounts = append(allAccounts, accounts...)
-	}
-	return allAccounts, nil
-}
-
-func getBalance(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func getBudget(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		return
@@ -397,27 +249,4 @@ func getUserId(r *http.Request) (int, error) {
 		return -1, err
 	}
 	return int(userId), nil
-}
-
-func getSpendings(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodOptions {
-		return
-	}
-	userId, err := getUserId(r)
-	if err != nil {
-		log.Fatal(err)
-		//TODO: just pass w into getUserId and write a bad status header
-	}
-
-	spendings, err := db.GetSpendingsForLastMonth(userId)
-	if err != nil {
-		log.Fatal(err)
-	}
-	w.WriteHeader(http.StatusOK)
-	resp := map[string]float32{"spendings": spendings}
-	json, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatal(err)
-	}
-	w.Write(json)
 }

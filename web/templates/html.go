@@ -30,7 +30,7 @@ var (
 	//navbar       = parse("navbar.html")
 	login        = parse("login.html")
 	user         = parse("user.html")
-	accounts     = parse("accounts.html")
+	accounts     = parse("accounts.html", "navbar.html")
 	budget       = parse("budget.html")
 	transactions = parse("transactions.html")
 	updateLink   = parse("updateLink.html")
@@ -67,4 +67,12 @@ type HomeParams struct {
 
 func Home(w io.Writer, p any) error {
 	return home.Execute(w, p)
+}
+
+type AccountsParams struct {
+	Accounts []types.Account
+}
+
+func Accounts(w io.Writer, p AccountsParams) error {
+	return accounts.Execute(w, p)
 }
