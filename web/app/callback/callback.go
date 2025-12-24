@@ -63,6 +63,7 @@ func Handler(auth *authenticator.Authenticator, db *database.DB) http.HandlerFun
 			}
 		}
 
+		profile["UserId"] = userId
 		session.Values["userId"] = userId
 		session.Values["access_token"] = token.AccessToken
 		session.Values["profile"] = profile

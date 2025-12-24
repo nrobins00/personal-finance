@@ -30,7 +30,7 @@ async function exchangePublicToken(public_token, metadata) {
   });
   const data = await response.json();
   console.log(data.access_token);
-  //window.location.replace("http://" + hostname + "/home")
+  window.location.replace("http://" + hostname + "/home")
 }
 
 function linkClickHandler() {
