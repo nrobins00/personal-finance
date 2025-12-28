@@ -16,13 +16,12 @@ func AccountsHandler(db *database.DB) http.HandlerFunc {
 
 		context := r.Context()
 		session := context.Value("session").(*sessions.Session)
-		fmt.Println("hit homepage")
 
-		if session.Values["userId"] == nil {
-			//TODO: redirect to new user or sign in page
-			w.WriteHeader(404)
-			return
-		}
+		// if session.Values["userId"] == nil {
+		// 	//TODO: redirect to new user or sign in page
+		// 	w.WriteHeader(404)
+		// 	return
+		// }
 
 		userId := session.Values["userId"].(int64)
 

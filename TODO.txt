@@ -1,8 +1,12 @@
 TODO:
+[ ] implement budgets
+    [ ] sub-budgets for broad categories
+    [ ] fancy front-end entry form to handle optional "advanced"
+    [ ] somewhere (probably home screen) compare spending to budget for categories
 
-[ ] webhooks for auto updating transaction history
-    [ ] never call getTransactions directly from user. webhook will fire when update is needed
-    [ ] ngrok for port forwarding to listen to webhooks
+[x] webhooks for auto updating transaction history
+    [x] never call getTransactions directly from user. webhook will fire when update is needed
+    [x] ngrok for port forwarding to listen to webhooks
 
 [ ] database updates
     [ ] maybe can use some kind of special handling that sets a transaction's accountKey only if the account exists
@@ -16,7 +20,5 @@ TODO:
     [ ] move authentication into middleware
     [ ] better auth / secure storage of access key 
 
-- redo getting transactions
-- adding filter option to transaction list
 - sessions (https://pkg.go.dev/github.com/gorilla/sessions#section-readme)
 - filter by primary categories?

@@ -76,3 +76,11 @@ type AccountsParams struct {
 func Accounts(w io.Writer, p AccountsParams) error {
 	return accounts.Execute(w, p)
 }
+
+type BudgetParams struct {
+	CurrentBudget float32
+}
+
+func Budget(w io.Writer, p any) error {
+	return budget.Execute(w, p)
+}

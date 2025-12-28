@@ -99,5 +99,19 @@ func CreateDatabase(filename string) *DB {
 		log.Fatal("createBudgetTable", err)
 	}
 
+	const createSubBudgetTable string = `
+		CREATE TABLE IF NOT EXISTS subBudget (
+			subBudgetKey INTEGER NOT NULL PRIMARY KEY,
+			budgetKey INTEGER NOT NULL,
+			category TEXT,
+			amount REAL,
+			FOREIGN KEY(budgetKey) REFERENCES budget(budgetKey)
+		);
+	`
+
+	if _, err := db.Exec(createSubBudgetTable); err != nil {
+		log.Fatal("createSubBudgetTable", err)
+	}
+
 	return &DB{db}
 }
