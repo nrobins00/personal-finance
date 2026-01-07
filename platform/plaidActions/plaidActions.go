@@ -10,16 +10,21 @@ import (
 )
 
 type PlaidClient struct {
-	ClientId string
-	Secret   string
-	client   *plaid.APIClient
+	ClientId   string
+	Secret     string
+	client     *plaid.APIClient
+	WebhookUrl string
 }
 
-func (client *PlaidClient) InitClient() {
+func (client *PlaidClient) InitClient(prod bool) {
 	configuration := plaid.NewConfiguration()
 	configuration.AddDefaultHeader("plaid-client-id", client.ClientId)
 	configuration.AddDefaultHeader("plaid-secret", client.Secret)
-	configuration.UseEnvironment(plaid.Sandbox)
+	if prod {
+		configuration.UseEnvironment(plaid.Production)
+	} else {
+		configuration.UseEnvironment(plaid.Sandbox)
+	}
 	client.client = plaid.NewAPIClient(configuration)
 }
 
@@ -30,8 +35,8 @@ func (c *PlaidClient) GetLinkToken() string {
 		"Plaid Test", "en", []plaid.CountryCode{plaid.COUNTRYCODE_US},
 		user,
 	)
-	//request.SetWebhook("https://eocttvfeaqmdhw.m.pipedream.net")
-	request.SetWebhook("https://mighty-snail-pleasant.ngrok-free.app/webhooks")
+
+	request.SetWebhook(c.WebhookUrl + "/webhooks")
 	request.SetProducts([]plaid.Products{plaid.PRODUCTS_AUTH, plaid.PRODUCTS_TRANSACTIONS})
 	request.SetLinkCustomizationName("default")
 	resp, httpResp, err := c.client.PlaidApi.LinkTokenCreate(ctx).LinkTokenCreateRequest(*request).Execute()

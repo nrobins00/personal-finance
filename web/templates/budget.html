@@ -1,9 +1,7 @@
 {{ define "content" }}
-	<p>Current budget: {{.CurrentBudget}}</p>
-	<form method="POST">
-		<label>
-			Budget: <input type="number" name="amount"/>
-		</label>
-		<button action="submit">Submit</button>
-	</form>
+<p>Current budget: {{.CurrentBudget}}</p>
+<form method="POST">
+  <label> Budget: <input type="number" name="amount" /> </label>
+  <button action="submit">Submit</button>
+</form>
 {{ end }}

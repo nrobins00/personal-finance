@@ -1,4 +1,6 @@
 TODO:
+[ ] don't make me sign in if i'm already signed in!
+
 [ ] implement budgets
     [ ] sub-budgets for broad categories
     [ ] fancy front-end entry form to handle optional "advanced"
